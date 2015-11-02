@@ -1,6 +1,7 @@
 #ifndef SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #define SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #include "observable_class.h"
+
 namespace Contact_Density_Optimization_Functions {
     extern int ND=3;
     extern int z_a=1;
@@ -32,11 +33,11 @@ namespace Contact_Density_Optimization_Functions {
         return (1. + 2*z_a*mag_ri_RA)*exp(l*mag_ri_RA);
     }
     
-    vec<double> gradient_f_AssarafExp(const double &mag_ri_RA, const vec<double> &ri_RA){//TODO Done with Mathematica, check therefore the calculation
+    vec<double> gradient_f_AssarafExp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA)*ri_RA/mag_ri_RA*(2*z_a+l+2*z_a*l*mag_ri_RA);
     }
-    double laplace_f_AssarafExp(const double &mag_ri_RA){//TODO still to implement correctly
-        return 0;
+    double laplace_f_AssarafExp(const double &mag_ri_RA){
+        return exp(l*mag_ri_RA)*(l*(2+l*mag_ri_RA)+2*z_a*(2+4*l*mag_ri_RA+l*l*mag_ri_RA*mag_ri_RA))/mag_ri_RA;
     }
     
     double f_Squared(const double &mag_ri_RA){
@@ -46,7 +47,6 @@ namespace Contact_Density_Optimization_Functions {
         return 4*z_a*ri_RA;
     }
     double laplace_f_Squared(const double &mag_ri_RA){
-        //return 2*z_a*(ND-1)/mag(ri-RA);
         return 3*4*z_a;
     }
 
@@ -161,7 +161,8 @@ private:
                         vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                         double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                         #pragma omp atomic
-                        tot_b(i)+= VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
+                        tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
+                        //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
                         ++n_measure_b(i);
                     }
                 }
@@ -200,9 +201,10 @@ public:
         double r_min = in.GetAttribute<double>("r_min",0.);
         double r_max = in.GetAttribute<double>("r_max",path.GetL()/2.);
         int n_r = in.GetAttribute<double>("n_r",1000);
-        gr_vol.x.CreateGridMiddle(r_min,r_max,n_r);
+        gr_vol.x.CreateGrid(r_min,r_max,n_r);
         gr_vol.y.zeros(n_r);
-        gr_b.x.CreateGridMiddle(r_min,r_max,n_r);
+        //gr_b.x.CreateGridMiddle(r_min,r_max,n_r);
+        gr_b.x.CreateGrid(r_min,r_max,n_r);
         gr_b.y.zeros(n_r);
         //Write things to file
         std::string data_type = "histogram";
@@ -257,6 +259,11 @@ public:
             Function_f=&Contact_Density_Optimization_Functions::f_Assaraf; 
             Function_gradient_f=&Contact_Density_Optimization_Functions::gradient_f_Assaraf;
             Function_laplace_f=&Contact_Density_Optimization_Functions::laplace_f_Assaraf;
+        }
+        else if (Optimization_Strategy=="AssarafExp"){
+            Function_f=&Contact_Density_Optimization_Functions::f_AssarafExp; 
+            Function_gradient_f=&Contact_Density_Optimization_Functions::gradient_f_AssarafExp;
+            Function_laplace_f=&Contact_Density_Optimization_Functions::laplace_f_AssarafExp;
         }
         else if (Optimization_Strategy=="Squared"){
             Function_f=&Contact_Density_Optimization_Functions::f_Squared; 
