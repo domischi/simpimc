@@ -137,23 +137,7 @@ private:
                     if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
                         continue;
                     }
-                    // Compute functions
-                    double f= Function_f(mag_ri_R);
-                    vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
-                    double laplacian_f = Function_laplace_f(mag_ri_R);
-
-                    // Volume Term
-                    //double tmp1=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f);
-                    //double tmp2=(-1./(mag_ri_R*4.*M_PI))*(f*(-laplacian_action));
-                    //double tmp3=(-1./(mag_ri_R*4.*M_PI))*(f*(dot(gradient_action,gradient_action)));
-                    //double tmp4=(-1./(mag_ri_R*4.*M_PI))*(- 2.*dot(gradient_f,gradient_action));
-                    //double tot = tmp1+tmp2+tmp3+tmp4;
-                    //if(tot>100) std::cout << "i="<<i<<"\ttmp1="<<tmp1<<"\ttmp2="<<tmp2<<"\ttmp3="<<tmp3<<"\ttmp4="<<tmp4<<"\ttot="<<tot<<std::endl;
-                    #pragma omp atomic
-                    tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-
-                    ++n_measure_vol(i);
-                    //Boundary Term
+                    //Boundary Term, before volume term, such that if we need to work with the image this is guaranteed by this
                     if(BE(R,ri_RA)&&path.GetPBC()) {
                         vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
                         R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
@@ -173,6 +157,14 @@ private:
                         //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
                         ++n_measure_b(i);
                     }
+                    double f= Function_f(mag_ri_R);
+                    vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
+                    double laplacian_f = Function_laplace_f(mag_ri_R);
+                    // Volume Term
+                    #pragma omp atomic
+                    tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+
+                    ++n_measure_vol(i);
                 }
             }
         }
