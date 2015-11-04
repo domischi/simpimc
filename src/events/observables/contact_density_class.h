@@ -1,7 +1,7 @@
 #ifndef SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #define SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #include "observable_class.h"
-
+//FIXME there is a numerical instability of the volume term in periodic bc... (typically the value is quite stable at around 0.3, but at some occasions the value explodes to give huge contributions, these is also what messes up everything.
 namespace Contact_Density_Optimization_Functions {
     extern int ND=3;
     extern int z_a=1;
@@ -143,13 +143,16 @@ private:
                     double laplacian_f = Function_laplace_f(mag_ri_R);
 
                     // Volume Term
+                    //double tmp1=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f);
+                    //double tmp2=(-1./(mag_ri_R*4.*M_PI))*(f*(-laplacian_action));
+                    //double tmp3=(-1./(mag_ri_R*4.*M_PI))*(f*(dot(gradient_action,gradient_action)));
+                    //double tmp4=(-1./(mag_ri_R*4.*M_PI))*(- 2.*dot(gradient_f,gradient_action));
+                    //double tot = tmp1+tmp2+tmp3+tmp4;
+                    //if(tot>100) std::cout << "i="<<i<<"\ttmp1="<<tmp1<<"\ttmp2="<<tmp2<<"\ttmp3="<<tmp3<<"\ttmp4="<<tmp4<<"\ttot="<<tot<<std::endl;
                     #pragma omp atomic
                     tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-                    //double tmp3= (-1./(mag_ri_R*4.*M_PI))*laplacian_f;
-                    //double tmp4= (-1./(mag_ri_R*4.*M_PI))*laplacian_f;
 
-                    //std::cout << "Strat: "<<Optimization_Strategy << "\ttmp1="<<tmp1<< "\ttmp1="<<tmp1<< "\ttmp1="<<tmp1<< "\ttmp1="<<tmp1<<std::endl;
-                    n_measure_vol(i)++;
+                    ++n_measure_vol(i);
                     //Boundary Term
                     if(BE(R,ri_RA)&&path.GetPBC()) {
                         vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
@@ -158,11 +161,16 @@ private:
                         mag_ri_R=mag(ri_R);
                         if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
+                        //mag_ri_R has changed, therefore need of recompute the functions
+                        double f= Function_f(mag_ri_R);
+                        vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
+                        double laplacian_f = Function_laplace_f(mag_ri_R);
                         vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
-                        double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
+                        //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
+                        double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                         #pragma omp atomic
                         tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
-                        //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
+                        //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
                         ++n_measure_b(i);
                     }
                 }
@@ -302,6 +310,7 @@ public:
                     gr_b.y(i) = gr_b.y(i)/(norm_b);
                 }
                 tot(i)=gr_vol.y(i)+gr_b.y(i);
+                //if(tot(i)>2) std::cout << "i="<<i<<"\tvol="<<gr_vol.y(i)<<"\tb="<<gr_b.y(i)<<"\ttot="<<tot(i)<<std::endl;
             }
             // Write to file
             if (first_time) {
