@@ -127,10 +127,20 @@ private:
                 Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
+                int nImages=1;
                 #pragma omp parallel for
-                for (uint32_t i=0;i<gr_vol.x.n_r;++i){
+                for (uint32_t i=0;i<gr_vol.x.n_r;++i)
+                for(int n1=-nImages;n1<nImages;++n1)
+                for(int n2=-floor(sqrt(nImages-n1));n2<ceil(sqrt(nImages-n1));++n2)
+                for(int n3=-floor(sqrt(nImages-n1-n2));n3<ceil(sqrt(nImages-n1-n2));++n3)
+                {
                     vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                    vec<double> R=path.Dr(RA,Rhist);
+                    vec<double> RImage;
+                    RImage.fill(path.GetL());
+                    RImage[0]*=n1;
+                    RImage[1]*=n2;
+                    RImage[2]*=n3;
+                    vec<double> R=path.Dr(RA,Rhist)+RImage;
                     // Get differences
                     vec<double> ri_R(path.Dr(ri,R));
                     double mag_ri_R = mag(ri_R);
@@ -140,9 +150,9 @@ private:
                     //Boundary Term, before volume term, such that if we need to work with the image this is guaranteed by this
                     if(BE(R,ri_RA)&&path.GetPBC()) {
                         vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
-                        R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
-                        ri_R=path.Dr(ri,R);
-                        mag_ri_R=mag(ri_R);
+                        //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
+                        //ri_R=path.Dr(ri,R);
+                        //mag_ri_R=mag(ri_R);
                         if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
                         //mag_ri_R has changed, therefore need of recompute the functions
@@ -164,8 +174,8 @@ private:
                     #pragma omp atomic
                     tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
 
-                    ++n_measure_vol(i);
                 }
+                n_measure_vol(i)+=gr_vol.x.n_r;
             }
         }
         double cofactor = path.GetSign()*path.GetImportanceWeight();
