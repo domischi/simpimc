@@ -1,7 +1,6 @@
 #ifndef SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #define SIMPIMC_OBSERVABLES_CONTACT_DENSITY_CLASS_H_
 #include "observable_class.h"
-//FIXME there is a numerical instability of the volume term in periodic bc... (typically the value is quite stable at around 0.3, but at some occasions the value explodes to give huge contributions, these is also what messes up everything.
 namespace Contact_Density_Optimization_Functions {
     extern int ND=3;
     extern int z_a=1;
@@ -127,53 +126,53 @@ private:
                 Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
-                int nImages=1;
+                int nImages=1;//TODO do not fix this to one and move it into the constructor
                 #pragma omp parallel for
-                for (uint32_t i=0;i<gr_vol.x.n_r;++i)
-                for(int n1=-nImages;n1<nImages;++n1)
-                for(int n2=-floor(sqrt(nImages-n1));n2<ceil(sqrt(nImages-n1));++n2)
-                for(int n3=-floor(sqrt(nImages-n1-n2));n3<ceil(sqrt(nImages-n1-n2));++n3)
-                {
-                    vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                    vec<double> RImage;
-                    RImage.fill(path.GetL());
-                    RImage[0]*=n1;
-                    RImage[1]*=n2;
-                    RImage[2]*=n3;
-                    vec<double> R=path.Dr(RA,Rhist)+RImage;
-                    // Get differences
-                    vec<double> ri_R(path.Dr(ri,R));
-                    double mag_ri_R = mag(ri_R);
-                    if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
-                        continue;
-                    }
-                    //Boundary Term, before volume term, such that if we need to work with the image this is guaranteed by this
-                    if(BE(R,ri_RA)&&path.GetPBC()) {
-                        vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
-                        //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
-                        //ri_R=path.Dr(ri,R);
-                        //mag_ri_R=mag(ri_R);
-                        if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
+                    int loc_boundary_counter=0;//make sure to count the right number of boundary events
+                    for(int n1=-nImages;n1<nImages;++n1)
+                    for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
+                    for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
+                    {
+                        vec<double> Rhist=gr_vol.x.rs(i)*Direction;
+                        vec<double> RImage;
+                        RImage.fill(path.GetL());
+                        RImage[0]*=n1;
+                        RImage[1]*=n2;
+                        RImage[2]*=n3;
+                        vec<double> R=path.Dr(RA,Rhist)+RImage;
+                        // Get differences
+                        vec<double> ri_R(path.Dr(ri,R));
+                        double mag_ri_R = mag(ri_R);
+                        if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
                             continue;
-                        //mag_ri_R has changed, therefore need of recompute the functions
+                        }
+                        //Compute functions
                         double f= Function_f(mag_ri_R);
                         vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                         double laplacian_f = Function_laplace_f(mag_ri_R);
-                        vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
-                        //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
-                        double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
+                        // Volume Term
                         #pragma omp atomic
-                        tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
-                        //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
-                        ++n_measure_b(i);
+                        tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                        //Boundary Term
+                        if(BE(R,ri_RA)&&path.GetPBC()) {
+                            vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
+                            //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
+                            //ri_R=path.Dr(ri,R);
+                            //mag_ri_R=mag(ri_R);
+                            if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                                continue;
+                            //mag_ri_R has changed, therefore need of recompute the functions
+                            vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
+                            //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
+                            double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
+                            #pragma omp atomic
+                            tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
+                            //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
+                            //++n_measure_b(i);
+                            ++loc_boundary_counter;
+                        }
                     }
-                    double f= Function_f(mag_ri_R);
-                    vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
-                    double laplacian_f = Function_laplace_f(mag_ri_R);
-                    // Volume Term
-                    #pragma omp atomic
-                    tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-
                 }
                 n_measure_vol(i)+=gr_vol.x.n_r;
             }
