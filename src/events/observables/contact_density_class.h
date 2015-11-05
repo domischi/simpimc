@@ -69,8 +69,8 @@ private:
     vec<double> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
     vec<double> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
     uint32_t z_a; ///< Charge of ion-like particle
-    uint32_t nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
-    uint32_t nImagesTot; ///< Totally, summed up spherically
+    int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
+    int nImagesTot; ///< Totally, summed up spherically
     double inImagesTot; ///< 1.0/nImagesTot, used for the summation of the counters for the times we measure
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
@@ -129,16 +129,15 @@ private:
                 Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
-                #pragma omp parallel for
+                //#pragma omp parallel for
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     int loc_boundary_counter=0;//make sure to count the right number of boundary events
                     for(int n1=-nImages;n1<nImages;++n1)
                     for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
                     for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
                     {
-                        std::cout << "here"<< std::endl;
                         vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                        vec<double> RImage;
+                        vec<double> RImage(path.GetND());
                         RImage.fill(path.GetL());
                         RImage[0]*=n1;
                         RImage[1]*=n2;
@@ -157,7 +156,7 @@ private:
                         // Volume Term
                         #pragma omp atomic
                         tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-                        n_measure_vol(i)+=inImagesTot;
+                        n_measure_vol(i)+=inImagesTot; //TODO this is maybe wrong, if i skip earlier, this wouldn't make a problem, would it?
                         //Boundary Term
                         if(BE(R,ri_RA)&&path.GetPBC()) {
                             vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
@@ -306,6 +305,7 @@ public:
     /// Write relevant information about an observable to the output
     virtual void Write()
     {
+        std::cout << "in write with min of the counters:" << min(n_measure_vol+n_measure_b)<< std::endl; 
         if (min(n_measure_vol+n_measure_b) > 0) {
             vec<double> tot(zeros<vec<double>>(gr_vol.x.n_r)); 
             // Normalize
