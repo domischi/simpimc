@@ -3,122 +3,108 @@
 
 #include "species_class.h"
 
-
 /// Main data holding object. Contains all information about the path integral. Holds a vector of Species objects.
 class Path
 {
 private:
-  ModeType mode; ///< Holds the current mode.
-  double L; ///< Cubic box side length
-  double iL; ///< Inverse of cubic box side length
-  double vol; ///< Volume of the simulation cell
-  double surface; ///<surface of the simulation cell (relevant for boundary term integration)
-  bool pbc; ///< Whether or not using periodic boundary conditions
-  double beta; ///< Inverse temperature: 1/(k_B T)
-  double importance_weight; ///< Importance weight of current configuration
-  double tau; ///< Time step
-  uint32_t n_bead; ///< Total number of time slices
-  uint32_t n_d; ///< Number of spatial dimensions
-  uint32_t n_species; ///< Total number of species of particles
-  uint32_t proc_i; ///< Process index
+  ModeType mode_; ///< Holds the current mode.
+  double L_; ///< Cubic box side length
+  double iL_; ///< Inverse of cubic box side length
+  double vol_; ///< Volume of the simulation cell
+  double surface_; ///< Surface area of the simulation cell
+  bool pbc_; ///< Whether or not using periodic boundary conditions
+  double beta_; ///< Inverse temperature: 1/(k_B T)
+  double importance_weight_; ///< Importance weight of current configuration
+  double tau_; ///< Time step
+  uint32_t n_bead_; ///< Total number of time slices
+  uint32_t n_d_; ///< Number of spatial dimensions
+  std::vector<std::shared_ptr<Species>> species_; ///< Vector holding pointers to all species objects
 public:
   KSpace ks; ///< K space data container
-  std::vector<std::shared_ptr<Species>> species_list; ///< Vector holding pointers to all species objects
-  vec<uint32_t> bead_loop; ///< Helper vector for indexing the periodicity in beta
 
-  /// Constructor only sets process index
-  Path(uint32_t t_proc_i, Input &in, IO &out, RNG &rng)
-   : proc_i(t_proc_i),
-     n_d(in.GetChild("System").GetAttribute<uint32_t>("n_d")),
-     n_bead(in.GetChild("System").GetAttribute<uint32_t>("n_bead")),
-     beta(in.GetChild("System").GetAttribute<double>("beta")),
-     pbc(in.GetChild("System").GetAttribute<bool>("pbc", true)),
-     L(in.GetChild("System").GetAttribute<double>("L", 0.)),
-     importance_weight(1.)
+  /// Constructor sets system specific variables
+  Path(uint32_t proc_i, Input &in, IO &out, RNG &rng)
+   : n_d_(in.GetChild("System").GetAttribute<uint32_t>("n_d")),
+     n_bead_(in.GetChild("System").GetAttribute<uint32_t>("n_bead")),
+     beta_(in.GetChild("System").GetAttribute<double>("beta")),
+     pbc_(in.GetChild("System").GetAttribute<bool>("pbc", true)),
+     L_(in.GetChild("System").GetAttribute<double>("L", 0.)),
+     importance_weight_(1.)
   {
     // Computed constants
-    if (pbc) {
-      iL = 1./L;
-      vol = pow(L,n_d);
-      surface = 2*n_d*pow(L,n_d-1); 
+    if (pbc_) {
+      iL_ = 1./L_;
+      vol_ = pow(L_,n_d_);
+      surface_ = 2*n_d_*pow(L_,n_d_-1);
     } else {
-      L = 0.;
-      iL = 0.;
-      vol = 1.;
-      surface=1.;
+      L_ = 0.;
+      iL_ = 0.;
+      vol_ = 1.;
+      surface_ = 1.;
     }
-    tau = beta/(1.*n_bead);
+    tau_ = beta_/(1.*n_bead_);
 
     // Write out constants
     out.CreateGroup("System");
-    out.Write("System/n_d",n_d);
-    out.Write("System/n_bead",n_bead);
-    out.Write("System/beta",beta);
-    out.Write("System/pbc",pbc);
-    out.Write("System/L",L);
-    out.Write("System/tau",tau);
+    out.Write("System/n_d",n_d_);
+    out.Write("System/n_bead",n_bead_);
+    out.Write("System/beta",beta_);
+    out.Write("System/pbc",pbc_);
+    out.Write("System/L",L_);
+    out.Write("System/tau",tau_);
 
     // Initiate mode
     SetMode(NEW_MODE);
 
     // Setup k space
-    ks.n_d = n_d;
-    ks.L = L;
+    ks.n_d = n_d_;
+    ks.L = L_;
     ks.cutoff = 0.;
-    double k_cut = in.GetChild("System").GetAttribute<double>("k_cut",2.*M_PI/L);
+    double k_cut = in.GetChild("System").GetAttribute<double>("k_cut",2.*M_PI/L_);
     ks.Setup(k_cut);
 
     // Initialize species
     out.CreateGroup("System/Particles");
     std::vector<Input> species_input = in.GetChild("Particles").GetChildList("Species");
-    n_species = species_input.size();
-    for (uint32_t s_i=0; s_i<n_species; s_i++)
-      species_list.push_back(std::make_shared<Species>(species_input[s_i],out,s_i,n_d,n_bead,mode,ks,rng,proc_i));
-
-    // Init rho_k for each species
-    for (auto& species : species_list)
-      species->InitRhoK();
-
-    // Initiate bead looping
-    bead_loop.set_size(2*n_bead);
-    for (uint32_t b_i = 0; b_i < n_bead; b_i++) {
-      bead_loop(b_i) = b_i;
-      bead_loop(b_i + n_bead) = bead_loop(b_i);
-    }
+    for (uint32_t s_i=0; s_i<species_input.size(); s_i++)
+      species_.push_back(std::make_shared<Species>(species_input[s_i],out,s_i,n_d_,n_bead_,mode_,ks,rng,proc_i));
 
   }
 
   /// Return L
-  const double GetL() { return L; }
+  const double GetL() { return L_; }
 
   /// Return 1/L
-  const double GetInverseL() { return iL; }
+  const double GetInverseL() { return iL_; }
 
   /// Return volume
-  const double GetVol() { return vol; }
+  const double GetVol() { return vol_; }
 
   /// Return surface
-  const double GetSurface() { return surface; }
+  const double GetSurface() { return surface_; }
 
   /// Sets species index by matching the species name string
   std::shared_ptr<Species> GetSpecies(const std::string &species_name)
   {
-    for (const auto& species : species_list)
+    for (const auto& species : species_)
       if (species->GetName() == species_name)
         return species;
     std::cerr << "ERROR: No species of name " << species_name << " !" << std::endl;
   }
 
+  /// Sets species index by matching the species name string
+  std::vector<std::shared_ptr<Species>>& GetSpecies() { return species_; }
+
   /// Set the mode to the passed mode
-  void SetMode(ModeType t_mode) { mode = t_mode; }
+  void SetMode(ModeType mode) { mode_ = mode; }
 
   /// Returns the current mode
-  ModeType GetMode() { return mode; };
+  ModeType GetMode() { return mode_; };
 
   /// Print the current configuration to screen
   void Print()
   {
-    for (const auto& species : species_list)
+    for (const auto& species : species_)
       species->Print();
     std::cout << std::endl;
   }
@@ -145,9 +131,8 @@ public:
   /// Enforce the periodic boundary condition on a vector
   void PutInBox(vec<double> &r)
   {
-    if(pbc)//TODO check with etano, otherwise undefined behaviour...
-        for (uint32_t d_i=0; d_i<n_d; ++d_i)
-            r(d_i) -= nearbyint(r(d_i)*iL)*L;
+    for (uint32_t d_i=0; d_i<n_d_; ++d_i)
+      r(d_i) -= nearbyint(r(d_i)*iL_)*L_;
   }
 
   /// Get dr, dr_p, and drr_p
@@ -155,13 +140,13 @@ public:
   {
     vec<double> r = s1->GetBead(p1,b0)->GetR() - s0->GetBead(p0,b0)->GetR();
     vec<double> r_p = s1->GetBead(p1,b1)->GetR() - s0->GetBead(p0,b1)->GetR();
-    for (uint32_t d_i=0; d_i<n_d; ++d_i) {
-      r(d_i) -= nearbyint(r(d_i)*iL)*L;
-      r_p(d_i) += nearbyint((r(d_i)-r_p(d_i))*iL)*L;
+    for (uint32_t d_i=0; d_i<n_d_; ++d_i) {
+      r(d_i) -= nearbyint(r(d_i)*iL_)*L_;
+      r_p(d_i) += nearbyint((r(d_i)-r_p(d_i))*iL_)*L_;
     }
     vec<double> r_r_p = r - r_p;
-    for (uint32_t d_i=0; d_i<n_d; ++d_i)
-      r_r_p(d_i) -= nearbyint(r_r_p(d_i)*iL)*L;
+    for (uint32_t d_i=0; d_i<n_d_; ++d_i)
+      r_r_p(d_i) -= nearbyint(r_r_p(d_i)*iL_)*L_;
     r_mag = mag(r);
     r_p_mag = mag(r_p);
     r_r_p_mag = mag(r_r_p);
@@ -172,13 +157,13 @@ public:
   {
     r = s1->GetBead(p1,b0)->GetR() - s0->GetBead(p0,b0)->GetR();
     r_p = s1->GetBead(p1,b1)->GetR() - s0->GetBead(p0,b1)->GetR();
-    for (uint32_t d_i=0; d_i<n_d; ++d_i) {
-      r(d_i) -= nearbyint(r(d_i)*iL)*L;
-      r_p(d_i) += nearbyint((r(d_i)-r_p(d_i))*iL)*L;
+    for (uint32_t d_i=0; d_i<n_d_; ++d_i) {
+      r(d_i) -= nearbyint(r(d_i)*iL_)*L_;
+      r_p(d_i) += nearbyint((r(d_i)-r_p(d_i))*iL_)*L_;
     }
     r_r_p = r - r_p;
-    for (uint32_t d_i=0; d_i<n_d; ++d_i)
-      r_r_p(d_i) -= nearbyint(r_r_p(d_i)*iL)*L;
+    for (uint32_t d_i=0; d_i<n_d_; ++d_i)
+      r_r_p(d_i) -= nearbyint(r_r_p(d_i)*iL_)*L_;
     r_mag = mag(r);
     r_p_mag = mag(r_p);
     r_r_p_mag = mag(r_r_p);
@@ -188,31 +173,31 @@ public:
   int GetSign()
   {
     int sign = 1;
-    for (auto& species : species_list)
+    for (auto& species : species_)
       sign *= species->GetSign();
     return sign;
   }
 
   /// Return the importance weight of the current configuration
-  const double GetImportanceWeight() { return importance_weight; }
+  const double GetImportanceWeight() { return importance_weight_; }
 
   /// Return the importance weight of the current configuration
-  void SetImportanceWeight(const double t_importance_weight) { importance_weight = t_importance_weight; }
+  void SetImportanceWeight(const double importance_weight) { importance_weight_ = importance_weight; }
 
   /// Return the time step
-  const double GetTau() { return tau; }
+  const double GetTau() { return tau_; }
 
-  /// Return the dimension
-  const uint32_t GetND() { return n_d; }
+  /// Return the time step
+  const uint32_t GetND() { return n_d_; }
 
-  /// Return the number of beads
-  const uint32_t GetNBead() { return n_bead; }
+  /// Return the time step
+  const uint32_t GetNBead() { return n_bead_; }
 
-  /// Return the the number of different species
-  const uint32_t GetNSpecies() { return n_species; }
+  /// Return the time step
+  const uint32_t GetNSpecies() { return species_.size(); }
 
   /// Return if we are using periodic boundary conditions or not
-  const bool GetPBC() { return pbc; }
+  const bool GetPBC() { return pbc_; }
 };
 
 #endif // SIMPIMC_PATH_CLASS_H_

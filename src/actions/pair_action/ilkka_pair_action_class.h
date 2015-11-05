@@ -118,7 +118,7 @@ private:
     #pragma omp parallel for collapse(2) reduction(+:tot)
     for (uint32_t k_i=0; k_i<n_ks; k_i++)
       for (uint32_t b_i=b_0; b_i<b_1; b_i+=skip)
-        tot += u_long_k(k_i)*CMag2(rho_k_a(path.bead_loop(b_i))(k_i),rho_k_b(path.bead_loop(b_i))(k_i));
+        tot += u_long_k(k_i)*CMag2(rho_k_a(species_a->bead_loop(b_i))(k_i),rho_k_b(species_b->bead_loop(b_i))(k_i));
 
     if (species_a != species_b)
       tot *= 2.;
@@ -167,7 +167,7 @@ private:
     #pragma omp parallel for collapse(2) reduction(+:tot)
     for (uint32_t k_i=0; k_i<n_ks; k_i++)
       for (uint32_t b_i=0; b_i<path.GetNBead(); b_i++)
-        tot += du_long_k(k_i)*CMag2(rho_k_a(path.bead_loop(b_i))(k_i),rho_k_b(path.bead_loop(b_i))(k_i));
+        tot += du_long_k(k_i)*CMag2(rho_k_a(species_a->bead_loop(b_i))(k_i),rho_k_b(species_b->bead_loop(b_i))(k_i));
 
     if (species_a != species_b)
       tot *= 2.;
@@ -185,10 +185,12 @@ private:
     double q = 0.5*(r_mag + r_p_mag);
     double x = q + 0.5*r_r_p_mag;
     double y = q - 0.5*r_r_p_mag;
+
     // Calculate U and (dU/dxp,dU/dyp)
     double u = 0.;
     vec<double> du_dxp_du_dyp(2);
     eval_NUBspline_2d_d_vg(u_xy_spline,x,y,&u,du_dxp_du_dyp.memptr());
+
     // Do chain rule to get (dU/dx_i,dU/dy_i,dU/dz_i)
     // dU/dx_i = dU/dxp dxp/dx_i + dU/dyp dyp/dx_i
     // and same for y_i and z_i
@@ -213,16 +215,17 @@ private:
       r_r_p_i_r_r_p_mag.zeros();
     vec<double> tot = -0.5*(du_dxp_du_dyp(0)*(r_i_r_mag + r_r_p_i_r_r_p_mag) + du_dxp_du_dyp(1)*(r_i_r_mag - r_r_p_i_r_r_p_mag));
 
-  // Subtract out long range part
+    // Subtract out long range part
     if (use_long_range) {
-    // Limits
+      // Limits
       SetLimits(r_u_min, r_u_max, r_mag, r_p_mag);
 
-    // Splines
-     double tmp_u, tmp_du_dr;
+      // Splines
+      double tmp_u, tmp_du_dr;
       eval_NUBspline_1d_d_vg(u_long_r_spline,r_mag,&tmp_u,&tmp_du_dr);
       tot -= 0.5*tmp_du_dr*r_i_r_mag;
-   }
+    }
+
     return tot;
   }
 
@@ -245,7 +248,7 @@ private:
     for (uint32_t b_i=b_0; b_i<b_1; b_i+=skip) {
       vec<std::complex<double>> &rho_k_a_i(species_a->GetBead(p_i,b_i)->GetRhoK());
       for (uint32_t k_i=0; k_i<path.ks.vecs.size(); k_i++) {
-        tot += u_long_k(k_i)*path.ks.vecs[k_i]*(rho_k_a_i(k_i).real()*rho_k_b(path.bead_loop(b_i))(k_i).imag() - rho_k_a_i(k_i).imag()*rho_k_b(path.bead_loop(b_i))(k_i).real());
+        tot += u_long_k(k_i)*path.ks.vecs[k_i]*(rho_k_a_i(k_i).real()*rho_k_b(species_b->bead_loop(b_i))(k_i).imag() - rho_k_a_i(k_i).imag()*rho_k_b(species_b->bead_loop(b_i))(k_i).real());
       }
     }
 
