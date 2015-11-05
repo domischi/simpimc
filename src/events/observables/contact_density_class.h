@@ -66,9 +66,12 @@ class ContactDensity : public Observable
 private:
     Histogram gr_vol; ///< Histogram representing g(r) arising from volume terms
     Histogram gr_b; ///< Histogram representing g(r) arising from boundary terms
-    vec<int> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
-    vec<int> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
+    vec<double> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
+    vec<double> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
     uint32_t z_a; ///< Charge of ion-like particle
+    uint32_t nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
+    uint32_t nImagesTot; ///< Totally, summed up spherically
+    double inImagesTot; ///< 1.0/nImagesTot, used for the summation of the counters for the times we measure
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
     std::shared_ptr<Species> species_b; ///< other species 
@@ -80,7 +83,7 @@ private:
     double (*Function_f)(const double &mag_ri_RA); ///< Function pointer for the possible generalization
     vec<double> (*Function_gradient_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     double (*Function_laplace_f)(const double &mag_ri_RA);
-
+    
     vec<double> getRelevantNormalVector(vec<double> r1,vec<double> r2){
         vec<double> n(zeros<vec<double>>(path.GetND())); 
         for(int d=0;d<path.GetND();++d){
@@ -126,7 +129,6 @@ private:
                 Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
-                int nImages=1;//TODO do not fix this to one and move it into the constructor
                 #pragma omp parallel for
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     int loc_boundary_counter=0;//make sure to count the right number of boundary events
@@ -134,6 +136,7 @@ private:
                     for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
                     for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
                     {
+                        std::cout << "here"<< std::endl;
                         vec<double> Rhist=gr_vol.x.rs(i)*Direction;
                         vec<double> RImage;
                         RImage.fill(path.GetL());
@@ -154,6 +157,7 @@ private:
                         // Volume Term
                         #pragma omp atomic
                         tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                        n_measure_vol(i)+=inImagesTot;
                         //Boundary Term
                         if(BE(R,ri_RA)&&path.GetPBC()) {
                             vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
@@ -169,12 +173,10 @@ private:
                             #pragma omp atomic
                             tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
                             //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
-                            //++n_measure_b(i);
-                            ++loc_boundary_counter;
+                            n_measure_b(i)+=inImagesTot;
                         }
                     }
                 }
-                n_measure_vol(i)+=gr_vol.x.n_r;
             }
         }
         double cofactor = path.GetSign()*path.GetImportanceWeight();
@@ -188,9 +190,9 @@ private:
     virtual void Reset()
     {
         gr_vol.y.zeros();
-        n_measure_vol = zeros<vec<int>>(gr_vol.x.n_r);
+        n_measure_vol = zeros<vec<double>>(gr_vol.x.n_r);
         gr_b.y.zeros();
-        n_measure_b = zeros<vec<int>>(gr_vol.x.n_r);
+        n_measure_b = zeros<vec<double>>(gr_vol.x.n_r);
     }
 
 public:
@@ -254,7 +256,17 @@ public:
                     particle_pairs.push_back(std::make_pair(p_i,p_j));
         }
         n_particle_pairs = particle_pairs.size();
-    
+        //Choose the number of Images to consider
+        if(path.GetPBC()) 
+            nImages=1;//TODO do not fix this to 1, but rather choose it wrt to the optimization strategy and introduce the cutoff in some fancy way... 
+        else 
+            nImages=0;
+        nImagesTot=0;
+        for(int n1=-nImages;n1<nImages;++n1)
+            for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
+                for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
+                    ++nImagesTot;
+        inImagesTot=1.0/nImagesTot;
         //Choose the optimization stategy
         Optimization_Strategy = in.GetAttribute<std::string>("optimization_strategy");
         Contact_Density_Optimization_Functions::ND=path.GetND();
