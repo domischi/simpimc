@@ -66,12 +66,11 @@ class ContactDensity : public Observable
 private:
     Histogram gr_vol; ///< Histogram representing g(r) arising from volume terms
     Histogram gr_b; ///< Histogram representing g(r) arising from boundary terms
-    vec<double> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
-    vec<double> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
+    vec<int> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
+    vec<int> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
     uint32_t z_a; ///< Charge of ion-like particle
     int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
     int nImagesTot; ///< Totally, summed up spherically
-    double inImagesTot; ///< 1.0/nImagesTot, used for the summation of the counters for the times we measure
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
     std::shared_ptr<Species> species_b; ///< other species 
@@ -131,7 +130,10 @@ private:
                 //Histogram loop
                 //#pragma omp parallel for
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
-                    int loc_boundary_counter=0;//make sure to count the right number of boundary events
+                    double vol_tmp=0;
+                    double bound_tmp=0;
+                    bool SaveVol=true;
+                    bool SaveBound=true;
                     for(int n1=-nImages;n1<nImages;++n1)
                     for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
                     for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
@@ -147,6 +149,8 @@ private:
                         vec<double> ri_R(path.Dr(ri,R));
                         double mag_ri_R = mag(ri_R);
                         if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
+                            SaveVol=false;
+                            SaveBound=false;
                             continue;
                         }
                         //Compute functions
@@ -155,8 +159,7 @@ private:
                         double laplacian_f = Function_laplace_f(mag_ri_R);
                         // Volume Term
                         #pragma omp atomic
-                        tot_vol(i) +=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-                        n_measure_vol(i)+=inImagesTot; //TODO this is maybe wrong, if i skip earlier, this wouldn't make a problem, would it?
+                        vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                         //Boundary Term
                         if(BE(R,ri_RA)&&path.GetPBC()) {
                             vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
@@ -164,18 +167,26 @@ private:
                             //ri_R=path.Dr(ri,R);
                             //mag_ri_R=mag(ri_R);
                             if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                                SaveBound=false;
                                 continue;
                             //mag_ri_R has changed, therefore need of recompute the functions
                             vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                             //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                             double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                             #pragma omp atomic
-                            tot_b(i)+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
+                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
                             //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
-                            n_measure_b(i)+=inImagesTot;
                         }
                     }
-                }
+				    if(SaveVol){
+                        tot_vol(i)+=vol_tmp;
+                        ++n_measure_vol(i);
+                    }
+				    if(SaveBound){
+                        tot_b(i)+=bound_tmp;
+                        ++n_measure_b(i);
+                    }
+                }//End of hist loop
             }
         }
         double cofactor = path.GetSign()*path.GetImportanceWeight();
@@ -189,9 +200,9 @@ private:
     virtual void Reset()
     {
         gr_vol.y.zeros();
-        n_measure_vol = zeros<vec<double>>(gr_vol.x.n_r);
+        n_measure_vol = zeros<vec<int>>(gr_vol.x.n_r);
         gr_b.y.zeros();
-        n_measure_b = zeros<vec<double>>(gr_vol.x.n_r);
+        n_measure_b = zeros<vec<int>>(gr_vol.x.n_r);
     }
 
 public:
@@ -265,7 +276,6 @@ public:
             for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
                 for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
                     ++nImagesTot;
-        inImagesTot=1.0/nImagesTot;
         //Choose the optimization stategy
         Optimization_Strategy = in.GetAttribute<std::string>("optimization_strategy");
         Contact_Density_Optimization_Functions::ND=path.GetND();
