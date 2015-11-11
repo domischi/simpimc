@@ -71,6 +71,7 @@ private:
     uint32_t z_a; ///< Charge of ion-like particle
     int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
     int nImagesTot; ///< Totally, summed up spherically
+    int counter;
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
     std::shared_ptr<Species> species_b; ///< other species 
@@ -115,7 +116,10 @@ private:
                 // Set r's
                 vec<double> RA = species_a->GetBead(particle_pairs[pp_i].first,b_i)->GetR();
                 vec<double> ri = species_b->GetBead(particle_pairs[pp_i].second,b_i)->GetR();
+                vec<double> ri2 = species_b->GetBead(particle_pairs[pp_i].second,b_i)->GetNextBead(1)->GetR();
                 vec<double> ri_RA(path.Dr(ri,RA));
+                vec<double> ri_RA2(path.Dr(ri2,RA));
+                vec<double> ri_ri2(path.Dr(ri,ri2));
                 // Sum over actions for ri
                 std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> only_ri{std::make_pair(species_b,particle_pairs[pp_i].second)};
                 vec<double> gradient_action(zeros<vec<double>>(path.GetND()));
@@ -132,25 +136,25 @@ private:
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     double vol_tmp=0;
                     double bound_tmp=0;
-                    bool SaveVol=true;
-                    bool SaveBound=true;
-                    for(int n1=-nImages;n1<nImages;++n1)
-                    for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
-                    for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
+                    //bool SaveVol=true;
+                    //bool SaveBound=true;
+                    //for(int n1=-nImages;n1<nImages;++n1)
+                    //for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
+                    //for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
                     {
                         vec<double> Rhist=gr_vol.x.rs(i)*Direction;
                         vec<double> RImage(path.GetND());
-                        RImage.fill(path.GetL());
-                        RImage[0]*=n1;
-                        RImage[1]*=n2;
-                        RImage[2]*=n3;
-                        vec<double> R=path.Dr(RA,Rhist)+RImage;
+                        //RImage.fill(path.GetL());
+                        //RImage[0]*=n1;
+                        //RImage[1]*=n2;
+                        //RImage[2]*=n3;
+                        vec<double> R=path.Dr(RA,Rhist);//+RImage;
                         // Get differences
                         vec<double> ri_R(path.Dr(ri,R));
                         double mag_ri_R = mag(ri_R);
                         if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
-                            SaveVol=false;
-                            SaveBound=false;
+                            //SaveVol=false;
+                            //SaveBound=false;
                             continue;
                         }
                         //Compute functions
@@ -161,13 +165,14 @@ private:
                         #pragma omp atomic
                         vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                         //Boundary Term
-                        if(BE(R,ri_RA)&&path.GetPBC()) {
-                            vec<double> NormalVector=getRelevantNormalVector(R,ri_RA);
+                        if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
+                            ++counter;
+                            vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
                             //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
                             //ri_R=path.Dr(ri,R);
                             //mag_ri_R=mag(ri_R);
                             if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
-                                SaveBound=false;
+                                //SaveBound=false;
                                 continue;
                             //mag_ri_R has changed, therefore need of recompute the functions
                             vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
@@ -178,14 +183,14 @@ private:
                             //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
                         }
                     }
-				    if(SaveVol){
+                    //if(SaveVol){
                         tot_vol(i)+=vol_tmp;
                         ++n_measure_vol(i);
-                    }
-				    if(SaveBound){
+                    //}
+    	            //if(SaveBound){
                         tot_b(i)+=bound_tmp;
                         ++n_measure_b(i);
-                    }
+                    //}
                 }//End of hist loop
             }
         }
@@ -199,6 +204,7 @@ private:
     /// Reset the observable's counters
     virtual void Reset()
     {
+        counter =0;
         gr_vol.y.zeros();
         n_measure_vol = zeros<vec<int>>(gr_vol.x.n_r);
         gr_b.y.zeros();
@@ -268,7 +274,7 @@ public:
         n_particle_pairs = particle_pairs.size();
         //Choose the number of Images to consider
         if(path.GetPBC()) 
-            nImages=1;//TODO do not fix this to 1, but rather choose it wrt to the optimization strategy and introduce the cutoff in some fancy way... 
+            nImages=3;//TODO now fixed to 0, to effectivly just sample without the image summation. 
         else 
             nImages=0;
         nImagesTot=0;
@@ -315,7 +321,6 @@ public:
     /// Write relevant information about an observable to the output
     virtual void Write()
     {
-        std::cout << "in write with min of the counters:" << min(n_measure_vol+n_measure_b)<< std::endl; 
         if (min(n_measure_vol+n_measure_b) > 0) {
             vec<double> tot(zeros<vec<double>>(gr_vol.x.n_r)); 
             // Normalize
