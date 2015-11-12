@@ -131,24 +131,26 @@ public:
   /// Returns the spatial gradient of the action between time slices b0 and b1 for a vector of particles
   virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
   {
+    //TODO implement the gradient in a similar fashion as the GetAction function (with use of the rho_free_splines)
     uint32_t skip = 1<<level;
     double i_4_lambda_level_tau = i_4_lambda_tau/skip;
     vec<double> tot(zeros<vec<double>>(path.GetND()));
+    vec<double> tmp(path.GetND());
     for (auto& p: particles) {
       if (p.first == species) {
         double gauss_prod, rho_free, dist;
         std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
         std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
         while(bead_a != bead_b) {
-          tot -= path.Dr(bead_a->GetPrevBead(skip),bead_a);
           std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
-          tot += path.Dr(bead_a,next_bead_a);
+          rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp);
+          tot -= tmp;
           bead_a = next_bead_a;
         }
       }
     }
 
-    return 2.*i_4_lambda_level_tau*tot;
+    return tot;
   }
 
   /// Returns the spatial laplacian of the action between time slices b0 and b1 for a vector of particles
