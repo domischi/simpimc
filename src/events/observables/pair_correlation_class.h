@@ -10,7 +10,8 @@ private:
   Histogram gr; ///< Histogram representing g(r)
   std::shared_ptr<Species> species_a; ///< First species
   std::shared_ptr<Species> species_b; ///< Second species
-
+  bool image_summation; ///< indicated whether we need to sum also over the images
+  int image_max; ///< if we need to sum over images this gives the maximal elongation along one direction
   /// Accumulate the observable
   virtual void Accumulate()
   {
@@ -23,25 +24,57 @@ private:
           for (uint32_t p_j=p_i+1; p_j<species_b->GetNPart(); ++p_j) {
             vec<double> dr(path.Dr(species_a->GetBead(p_i,b_i),species_b->GetBead(p_j,b_i)));
             uint32_t i = gr.x.ReverseMap(mag(dr));
+            // Direct Contribution
             if (i < gr.x.n_r)
               gr.y(i) = gr.y(i) + 1.*cofactor;
+            // Image Contribution
+            if (image_summation){
+              vec<double> shift(path.GetND());
+              for(int i0=-image_max;i0<image_max;++i0) 
+              for(int i1=-image_max;i1<image_max;++i1) 
+              for(int i2=-image_max;i2<image_max;++i2){
+                shift[0]=i0*path.GetL();
+                shift[1]=i1*path.GetL();
+                shift[2]=i2*path.GetL();
+                vec<double> dr_p=dr+shift;
+                uint32_t i_p = gr.x.ReverseMap(mag(dr_p));
+                if (i_p < gr.x.n_r)
+                  gr.y(i_p) = gr.y(i_p) + 1.*cofactor;
+              }
+            }
           }
         }
       }
+    }
     // Homologous
-    } else {
+    else {
       for (uint32_t b_i=0; b_i<path.GetNBead(); ++b_i) {
         for (uint32_t p_i=0; p_i<species_a->GetNPart(); ++p_i) {
           for (uint32_t p_j=0; p_j<species_b->GetNPart(); ++p_j) {
             vec<double> dr(path.Dr(species_a->GetBead(p_i,b_i),species_b->GetBead(p_j,b_i)));
             uint32_t i = gr.x.ReverseMap(mag(dr));
+            // Direct Contibution
             if (i < gr.x.n_r)
               gr.y(i) = gr.y(i) + 1.*cofactor;
+            // Image Contribution
+            if (image_summation){
+              vec<double> shift(path.GetND());
+              for(int i0=-image_max;i0<image_max;++i0) 
+              for(int i1=-image_max;i1<image_max;++i1) 
+              for(int i2=-image_max;i2<image_max;++i2){
+                shift[0]=i0*path.GetL();
+                shift[1]=i1*path.GetL();
+                shift[2]=i2*path.GetL();
+                vec<double> dr_p=dr+shift;
+                uint32_t i_p = gr.x.ReverseMap(mag(dr_p));
+                if (i_p < gr.x.n_r)
+                  gr.y(i_p) = gr.y(i_p) + 1.*cofactor;
+              }
+            }
           }
         }
       }
     }
-
     n_measure += 1;
   }
 
@@ -70,6 +103,12 @@ public:
     gr.x.CreateGrid(r_min,r_max,n_r);
     gr.y.zeros(n_r);
 
+    // Do we need to sum over images
+    image_summation=(r_max>path.GetL()/2);
+    if(image_summation)
+      image_max=ceil((r_max-path.GetL()/2)/path.GetL());
+    else
+      image_max=0;
     // Compute rs
     vec<double> rs(gr.x.n_r-1);
     for (uint32_t i=0; i<gr.x.n_r-1; i++) {
