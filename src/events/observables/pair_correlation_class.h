@@ -104,9 +104,9 @@ public:
     gr.y.zeros(n_r);
 
     // Do we need to sum over images
-    image_summation=(r_max>path.GetL()/2);
+    image_summation=(r_max>path.GetL()/2.0);
     if(image_summation)
-      image_max=ceil((r_max-path.GetL()/2)/path.GetL());
+      image_max=ceil((r_max-path.GetL()/2.0)/path.GetL());
     else
       image_max=0;
     // Compute rs
