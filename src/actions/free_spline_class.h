@@ -116,7 +116,7 @@ public:
     return rho_free;
   }
 
-  /// Returns gradient of log(rho_free) at r
+  /// Returns gradient of log(rho_free) at r, saves the gradient in the last argument
   double GetGradLogRhoFree(const vec<double> &r, vec<double> &grad_log_rho_free)
   {
     double tot = 0.;
@@ -126,7 +126,7 @@ public:
       grad_log_rho_free(d_i) = -d_image_action_d_r;
       tot -= image_action;
     }
-    grad_log_rho_free -= r*2.*i_4_lambda_tau;
+    //grad_log_rho_free -= r*2.*i_4_lambda_tau;
     return tot - dot(r,r)*i_4_lambda_tau;
   }
 
