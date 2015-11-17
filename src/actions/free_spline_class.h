@@ -130,6 +130,17 @@ public:
     return tot - dot(r,r)*i_4_lambda_tau;
   }
 
+  /// Returns laplacian of log(rho_free) at r, 
+  double GetLaplLogRhoFree(const vec<double> &r)
+  {
+    double tot = 0.;
+    for (uint32_t d_i=0; d_i<r.size(); d_i++) {
+      double image_action, d_image_action_d_r, d_2_image_action_d_r_2;
+      eval_UBspline_1d_d_vgl(image_action_spline,r(d_i),&image_action,&d_image_action_d_r,&d_2_image_action_d_r_2);
+      tot -= d_2_image_action_d_r_2;
+    }
+    return tot;
+  }
 };
 
 #endif // SIMPIMC_ACTIONS_FREE_SPLINE_CLASS_H_
