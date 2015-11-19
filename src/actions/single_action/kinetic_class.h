@@ -22,7 +22,9 @@ private:
     rho_free_splines[0] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau(), true);
     #pragma omp parallel for
     for (uint32_t spline_i=1; spline_i<n_spline; ++spline_i)
-      rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i+1), false);
+      //rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau(), false);
+      //rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i+1), false);
+      rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i), false);
   }
 public:
   /// Constructor calls Init

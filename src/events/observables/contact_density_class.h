@@ -69,8 +69,8 @@ private:
     vec<int> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
     vec<int> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
     uint32_t z_a; ///< Charge of ion-like particle
-    int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
-    int nImagesTot; ///< Totally, summed up spherically
+    //int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
+    //int nImagesTot; ///< Totally, summed up spherically
     int counter;
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
@@ -273,15 +273,15 @@ public:
         }
         n_particle_pairs = particle_pairs.size();
         //Choose the number of Images to consider
-        if(path.GetPBC()) 
-            nImages=3;//TODO now fixed to 0, to effectivly just sample without the image summation. 
-        else 
-            nImages=0;
-        nImagesTot=0;
-        for(int n1=-nImages;n1<nImages;++n1)
-            for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
-                for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
-                    ++nImagesTot;
+        //if(path.GetPBC()) 
+        //    nImages=3; 
+        //else 
+        //    nImages=0;
+        //nImagesTot=0;
+        //for(int n1=-nImages;n1<nImages;++n1)
+        //    for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
+        //        for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
+        //            ++nImagesTot;
         //Choose the optimization stategy
         Optimization_Strategy = in.GetAttribute<std::string>("optimization_strategy");
         Contact_Density_Optimization_Functions::ND=path.GetND();
