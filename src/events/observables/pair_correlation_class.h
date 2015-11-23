@@ -20,12 +20,14 @@ private:
     double cofactor = path.GetSign()*path.GetImportanceWeight();
     if (species_a == species_b) {
       for (uint32_t b_i=0; b_i<path.GetNBead(); ++b_i) {
-        for (uint32_t p_i=0; p_i<species_a->GetNPart()-1; ++p_i) {
-          for (uint32_t p_j=p_i+1; p_j<species_b->GetNPart(); ++p_j) {
+        for (uint32_t p_i=0; p_i<species_a->GetNPart(); ++p_i) {
+          //for (uint32_t p_j=p_i+1; p_j<species_b->GetNPart(); ++p_j) {
+          for (uint32_t p_j=p_i; p_j<species_b->GetNPart(); ++p_j) {
             vec<double> dr(path.Dr(species_a->GetBead(p_i,b_i),species_b->GetBead(p_j,b_i)));
+            double mag_dr=mag(dr);
             uint32_t i = gr.x.ReverseMap(mag(dr));
             // Direct Contribution
-            if (i < gr.x.n_r)
+            if (i < gr.x.n_r&&p_i!=p_j)
               gr.y(i) = gr.y(i) + 1.*cofactor;
             // Image Contribution
             if (image_summation){
@@ -142,7 +144,7 @@ public:
       double norm;
       if (species_a == species_b)
         //norm = 0.5*n_measure*species_a->GetNPart()*(species_b->GetNPart()-1)*path.GetNBead()/vol;
-        norm = 0.5*n_measure*species_a->GetNPart()*(species_b->GetNPart()-1)*path.GetNBead();
+        norm = 0.5*n_measure*species_a->GetNPart()*(species_b->GetNPart())*path.GetNBead();
       else
         //norm = n_measure*species_a->GetNPart()*species_b->GetNPart()*path.GetNBead()/vol;
         norm = n_measure*species_a->GetNPart()*species_b->GetNPart()*path.GetNBead();
