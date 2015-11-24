@@ -22,9 +22,7 @@ private:
     rho_free_splines[0] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau(), true);
     #pragma omp parallel for
     for (uint32_t spline_i=1; spline_i<n_spline; ++spline_i)
-      //rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau(), false);
-      //rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i+1), false);
-      rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i), false);
+      rho_free_splines[spline_i] = FreeSpline(path.GetL(), n_images, species->GetLambda(), path.GetTau()*(spline_i+1), false);
   }
 public:
   /// Constructor calls Init
@@ -122,6 +120,7 @@ public:
         while(bead_a != bead_b) {
           std::shared_ptr<Bead> next_bead_a(bead_a->GetNextBead(skip));
           tot -= rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a));
+          //tot -= (dot(bead_a->GetR(),bead_a->GetR())-dot(bead_b->GetR(),bead_b->GetR()))*i_4_lambda_level_tau;
           bead_a = next_bead_a;
         }
       }
