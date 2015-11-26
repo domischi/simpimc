@@ -71,7 +71,6 @@ private:
     uint32_t z_a; ///< Charge of ion-like particle
     //int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
     //int nImagesTot; ///< Totally, summed up spherically
-    int counter;
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
     std::shared_ptr<Species> species_b; ///< other species 
@@ -166,7 +165,6 @@ private:
                         vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                         //Boundary Term
                         if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
-                            ++counter;
                             vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
                             //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
                             //ri_R=path.Dr(ri,R);
@@ -179,7 +177,7 @@ private:
                             //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                             double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                             #pragma omp atomic
-                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart();//if more then one ion is present, make sure to divide to normalize it correctly
+                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);//if more then one ion is present, make sure to divide to normalize it correctly
                             //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
                         }
                     }
@@ -204,7 +202,6 @@ private:
     /// Reset the observable's counters
     virtual void Reset()
     {
-        counter =0;
         gr_vol.y.zeros();
         n_measure_vol = zeros<vec<int>>(gr_vol.x.n_r);
         gr_b.y.zeros();
@@ -331,10 +328,10 @@ public:
             //else
             //  norm = n_measure*species_a->GetNPart()*species_b->GetNPart()*path.GetNBead()/path.GetVol();
             for (uint32_t i=0; i<gr_vol.x.n_r; i++) {
-                norm_vol = n_measure_vol[i];
+                norm_vol = n_measure_vol[i]/species_a->GetNPart();
                 gr_vol.y(i) = gr_vol.y(i)/(norm_vol);
                 if(path.GetPBC()&&n_measure_b(i)!=0){//If we do not have pbc then we just save 0, otherwise similar to volume term
-                    norm_b = n_measure_b[i];
+                    norm_b = n_measure_b[i]/species_a->GetNPart();
                     gr_b.y(i) = gr_b.y(i)/(norm_b);
                 }
                 tot(i)=gr_vol.y(i)+gr_b.y(i);
