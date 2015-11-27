@@ -120,7 +120,6 @@ public:
         while(bead_a != bead_b) {
           std::shared_ptr<Bead> next_bead_a(bead_a->GetNextBead(skip));
           tot -= rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a));
-          //tot -= (dot(bead_a->GetR(),bead_a->GetR())-dot(bead_b->GetR(),bead_b->GetR()))*i_4_lambda_level_tau;
           bead_a = next_bead_a;
         }
       }
@@ -144,7 +143,7 @@ public:
         while(bead_a != bead_b) {
           std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
           rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp);
-          tot += tmp+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
+          tot -= tmp+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a)); //maybe the 2i4lambdatau is also for tmp, check again code of etano
           bead_a = next_bead_a;
         }
       }

@@ -41,7 +41,7 @@ public:
     double dr = (r_grid.end - r_grid.start)/(r_grid.num - 1);
 
     // Make image_action, d_image_action_d_tau, d_image_action_d_r
-    vec<double> image_action(ones<vec<double>>(r_grid.num));
+    vec<double> image_action(zeros<vec<double>>(r_grid.num));
     vec<double> d_image_action_d_tau(zeros<vec<double>>(r_grid.num));
     for (uint32_t i=0; i<r_grid.num; ++i) {
       double r = r_grid.start + i*dr;
@@ -56,22 +56,13 @@ public:
         double r_m_2_i_4_lambda_tau = r_m*r_m*i_4_lambda_tau;
         double d_r_2_r_m_2_i_4_lambda_tau = r_2_i_4_lambda_tau - r_m_2_i_4_lambda_tau;
         double exp_part_m = exp(d_r_2_r_m_2_i_4_lambda_tau);
-        image_action(i) *= exp_part_p * exp_part_m;
-        //image_action(i)+=exp(2*image*t_l*i_4_lambda_tau);
-        //image_action(i)-=d_r_2_r_p_2_i_4_lambda_tau+d_r_2_r_m_2_i_4_lambda_tau;
-        //double r_m_r_p=r-r_p;
-        //double r_p_r_p=r+r_p;
-        //double r_m_r_p_2=r_m_r_p*r_m_r_p;
-        //double r_p_r_p_2=r_p_r_p*r_p_r_p;
-        //double r_m_r_p_2_i_4_lambda_tau=r_m_r_p_2*i_4_lambda_tau;
-        //double r_p_r_p_2_i_4_lambda_tau=r_p_r_p_2*i_4_lambda_tau;
-        //image_action(i)+=r_m_r_p_2_i_4_lambda_tau+r_p_r_p_2_i_4_lambda_tau;
+        image_action(i) += exp_part_p + exp_part_m;
         if (use_tau_derivative)
           d_image_action_d_tau(i) += (d_r_2_r_p_2_i_4_lambda_tau*exp_part_p + d_r_2_r_m_2_i_4_lambda_tau*exp_part_m)/tau;
       }
       if (use_tau_derivative)
         d_image_action_d_tau(i) = d_image_action_d_tau(i)/(1.+image_action(i));
-      //image_action(i) = -log(image_action(i));
+      image_action(i) = -log1p(image_action(i));
     }
     BCtype_d xBC = {NATURAL, NATURAL};
     image_action_spline = create_UBspline_1d_d(r_grid, xBC, image_action.memptr());
@@ -92,7 +83,7 @@ public:
     double image_action;
     for (const auto &r_d : r) {
       eval_UBspline_1d_d(image_action_spline,r_d,&image_action);
-      tot -= image_action;//maybe a +
+      tot -= image_action;
     }
     return tot - dot(r,r)*i_4_lambda_tau;
   }
@@ -135,7 +126,7 @@ public:
       grad_log_rho_free(d_i) = -d_image_action_d_r;
       tot -= image_action;
     }
-    //grad_log_rho_free -= r*2.*i_4_lambda_tau;
+    grad_log_rho_free -= r*2.*i_4_lambda_tau;
     return tot - dot(r,r)*i_4_lambda_tau;
   }
 

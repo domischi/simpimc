@@ -131,7 +131,6 @@ private:
                 Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
-                //#pragma omp parallel for
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     double vol_tmp=0;
                     double bound_tmp=0;
@@ -161,24 +160,17 @@ private:
                         vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                         double laplacian_f = Function_laplace_f(mag_ri_R);
                         // Volume Term
-                        #pragma omp atomic
                         vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                         //Boundary Term
                         if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
                             vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                            //R+=NormalVector*path.GetL();//One has now to work with the picture of the particle in the other cell
-                            //ri_R=path.Dr(ri,R);
-                            //mag_ri_R=mag(ri_R);
                             if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                                 //SaveBound=false;
                                 continue;
-                            //mag_ri_R has changed, therefore need of recompute the functions
                             vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                             //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                             double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                            #pragma omp atomic
-                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);//if more then one ion is present, make sure to divide to normalize it correctly
-                            //std::cout << "i="<<i<<"\tvol="<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<"\tboundary="<<(-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector)/species_b->GetNPart()<<std::endl;
+                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
                         }
                     }
                     //if(SaveVol){
@@ -323,10 +315,6 @@ public:
             // Normalize
             double norm_vol;
             double norm_b;
-            //if (species_a == species_b)
-            //  norm = 0.5*n_measure*species_a->GetNPart()*(species_a->GetNPart()-1.)*path.GetNBead()/path.GetVol();
-            //else
-            //  norm = n_measure*species_a->GetNPart()*species_b->GetNPart()*path.GetNBead()/path.GetVol();
             for (uint32_t i=0; i<gr_vol.x.n_r; i++) {
                 norm_vol = n_measure_vol[i]/species_a->GetNPart();
                 gr_vol.y(i) = gr_vol.y(i)/(norm_vol);
@@ -335,7 +323,6 @@ public:
                     gr_b.y(i) = gr_b.y(i)/(norm_b);
                 }
                 tot(i)=gr_vol.y(i)+gr_b.y(i);
-                //if(tot(i)>2) std::cout << "i="<<i<<"\tvol="<<gr_vol.y(i)<<"\tb="<<gr_b.y(i)<<"\ttot="<<tot(i)<<std::endl;
             }
             // Write to file
             if (first_time) {
