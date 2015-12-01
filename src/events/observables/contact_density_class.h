@@ -169,8 +169,9 @@ private:
                                 continue;
                             vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                             //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
-                            double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                            bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
+                            //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
+                            //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
+                            bound_tmp+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
                         }
                     }
                     //if(SaveVol){

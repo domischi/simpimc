@@ -41,7 +41,7 @@ public:
     double dr = (r_grid.end - r_grid.start)/(r_grid.num - 1);
 
     // Make image_action, d_image_action_d_tau, d_image_action_d_r
-    vec<double> image_action(ones<vec<double>>(r_grid.num));
+    vec<double> image_action(zeros<vec<double>>(r_grid.num));
     vec<double> d_image_action_d_tau(zeros<vec<double>>(r_grid.num));
     for (uint32_t i=0; i<r_grid.num; ++i) {
       double r = r_grid.start + i*dr;
@@ -56,7 +56,7 @@ public:
         double r_m_2_i_4_lambda_tau = r_m*r_m*i_4_lambda_tau;
         double d_r_2_r_m_2_i_4_lambda_tau = r_2_i_4_lambda_tau - r_m_2_i_4_lambda_tau;
         double exp_part_m = exp(d_r_2_r_m_2_i_4_lambda_tau);
-        image_action(i) *= exp_part_p * exp_part_m;
+        image_action(i) += exp_part_p + exp_part_m;
         //image_action(i)+=exp(2*image*t_l*i_4_lambda_tau);
         //image_action(i)-=d_r_2_r_p_2_i_4_lambda_tau+d_r_2_r_m_2_i_4_lambda_tau;
         //double r_m_r_p=r-r_p;
@@ -71,7 +71,7 @@ public:
       }
       if (use_tau_derivative)
         d_image_action_d_tau(i) = d_image_action_d_tau(i)/(1.+image_action(i));
-      //image_action(i) = -log(image_action(i));
+      image_action(i) = -log1p(image_action(i));
     }
     BCtype_d xBC = {NATURAL, NATURAL};
     image_action_spline = create_UBspline_1d_d(r_grid, xBC, image_action.memptr());
@@ -129,6 +129,7 @@ public:
   double GetGradLogRhoFree(const vec<double> &r, vec<double> &grad_log_rho_free)
   {
     double tot = 0.;
+    grad_log_rho_free=zeros<vec<double>>(r.size());
     for (uint32_t d_i=0; d_i<r.size(); d_i++) {
       double image_action, d_image_action_d_r;
       eval_UBspline_1d_d_vg(image_action_spline,r(d_i),&image_action,&d_image_action_d_r);
