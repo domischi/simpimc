@@ -132,27 +132,14 @@ private:
                 Direction=Direction/norm(Direction);
                 //Histogram loop
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
-                    double vol_tmp=0;
-                    double bound_tmp=0;
-                    //bool SaveVol=true;
-                    //bool SaveBound=true;
-                    //for(int n1=-nImages;n1<nImages;++n1)
-                    //for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
-                    //for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
                     {
                         vec<double> Rhist=gr_vol.x.rs(i)*Direction;
                         vec<double> RImage(path.GetND());
-                        //RImage.fill(path.GetL());
-                        //RImage[0]*=n1;
-                        //RImage[1]*=n2;
-                        //RImage[2]*=n3;
-                        vec<double> R=path.Dr(RA,Rhist);//+RImage;
+                        vec<double> R=path.Dr(RA,Rhist);
                         // Get differences
                         vec<double> ri_R(path.Dr(ri,R));
                         double mag_ri_R = mag(ri_R);
                         if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
-                            //SaveVol=false;
-                            //SaveBound=false;
                             continue;
                         }
                         //Compute functions
@@ -160,28 +147,21 @@ private:
                         vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                         double laplacian_f = Function_laplace_f(mag_ri_R);
                         // Volume Term
-                        vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                        tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                        ++n_measure_vol(i);
                         //Boundary Term
                         if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
                             vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
                             if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
-                                //SaveBound=false;
                                 continue;
                             vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                             //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                             //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                             //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
-                            bound_tmp+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
+                            tot_b(i)+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
+                            ++n_measure_b(i);
                         }
                     }
-                    //if(SaveVol){
-                        tot_vol(i)+=vol_tmp;
-                        ++n_measure_vol(i);
-                    //}
-    	            //if(SaveBound){
-                        tot_b(i)+=bound_tmp;
-                        ++n_measure_b(i);
-                    //}
                 }//End of hist loop
             }
         }
