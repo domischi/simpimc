@@ -124,8 +124,14 @@ private:
                 vec<double> gradient_action(zeros<vec<double>>(path.GetND()));
                 double laplacian_action = 0.;
                 for (auto& action: action_list) {
+                    vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
+                    vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
                     gradient_action += action->GetActionGradient(b_i,b_i+1,only_ri,0);
+                    double lapl0=action->GetActionLaplacian(b_i,b_i+1,only_ri,0);
+                    double lapl1=action->GetActionLaplacian1(b_i,b_i+1,only_ri,0);
                     laplacian_action+= action->GetActionLaplacian(b_i,b_i+1,only_ri,0);
+                    if(action->name=="Kinetic" && abs(lapl1-lapl0)>1e-12) std::cout << "---\nin CD, different lapl, lapl0="<<lapl0<<"\tlapl1="<<lapl1<<std::endl;
+                    if(action->name=="Kinetic" && norm(grad0-grad1)>1e-16) std::cout << "---\nin CD, different grad, \ngrad0=\n"<<grad0<<"\ngrad1=\n"<<grad1<<std::endl;
                 }
                 vec<double> Direction(path.GetND());
                 Direction.randn();
