@@ -128,86 +128,98 @@ public:
     return tot;
   }
 
-  /// Returns the spatial gradient of the action between time slices b0 and b1 for a vector of particles
-  //virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
-  //{
-  //  uint32_t skip = 1<<level;
-  //  double i_4_lambda_level_tau = i_4_lambda_tau/skip;
-  //  vec<double> tot(zeros<vec<double>>(path.GetND()));
-  //  vec<double> tmp(path.GetND());
-  //  for (auto& p: particles) {
-  //    if (p.first == species) {
-  //      double gauss_prod, rho_free, dist;
-  //      std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
-  //      std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
-  //      while(bead_a != bead_b) {
-  //        std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
-  //        rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp);
-  //        tot += -tmp+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
-  //        bead_a = next_bead_a;
-  //      }
-  //    }
-  //  }
-  //  
-  //  return tot;
-  //}
-  virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
-    vec<double> grad=zeros<vec<double>>(path.GetND());
-    const double ep=1e-6;
-    for(auto& p: particles){
-        std::shared_ptr<Bead> bead_b(species->GetBead(p.second,b1));
-        if(p.first == species){
-            for(int i=0;i<path.GetND();++i){
-                vec<double> eps=zeros<vec<double>>(path.GetND());
-                eps[i]=ep;
-                bead_b->SetR(bead_b->GetR()+eps*path.GetL());
-                grad[i]+=(GetAction(b0,b1,particles,level));
-                bead_b->SetR(bead_b->GetR()-eps*path.GetL());
-                grad[i]-=(GetAction(b0,b1,particles,level));
-    }}}
-    grad=grad/ep;
+  // Returns the spatial gradient of the action between time slices b0 and b1 for a vector of particles
+  virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
+  {
+    uint32_t skip = 1<<level;
+    double i_4_lambda_level_tau = i_4_lambda_tau/skip;
+    vec<double> tot(zeros<vec<double>>(path.GetND()));
+    vec<double> tmp(path.GetND());
+    for (auto& p: particles) {
+      if (p.first == species) {
+        double gauss_prod, rho_free, dist;
+        std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
+        std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
+        while(bead_a != bead_b) {
+          std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
+          rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp);
+          tot += -tmp+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
+          bead_a = next_bead_a;
+        }
+      }
+    }
+    
+    return tot;
+  }
+  virtual vec<double> GetActionGradient1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
+    uint32_t skip = 1<<level;
+    double i_4_lambda_level_tau = i_4_lambda_tau/skip;
+    const double ep=1e-4;
+    vec<double> tot =zeros<vec<double>>(path.GetND());
+    for (auto& p: particles) {
+      if (p.first == species) {
+        std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
+        std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
+        while(bead_a != bead_b) {
+          std::shared_ptr<Bead> next_bead_a(bead_a->GetNextBead(skip));
+          for(int i=0;i<path.GetND();++i){
+            vec<double>eps=zeros<vec<double>>(path.GetND());
+            eps(i)=ep;
+            tot(i) -= (rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)+eps)-rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)))/ep;
+          }
+          bead_a = next_bead_a;
+        }
+      }
+    }
+
+    return tot;
   }
 
   /// Returns the spatial laplacian of the action between time slices b0 and b1 for a vector of particles
-  //virtual double GetActionLaplacian(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
-  //{
-  //  uint32_t skip = 1<<level;
-  //  double i_4_lambda_level_tau = i_4_lambda_tau/skip;
-  //  double tot = 0.;
-  //  vec<double> dr(path.GetND());
-  //  for (auto& p: particles) {
-  //    if (p.first == species) {
-  //      double gauss_prod, rho_free, dist;
-  //      std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
-  //      std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
-  //      while(bead_a != bead_b) {
-  //        std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
-  //        tot += path.GetND()*4.*i_4_lambda_level_tau-rho_free_splines[skip-1].GetLaplLogRhoFree(path.Dr(bead_a,next_bead_a));
-  //        bead_a = next_bead_a;
-  //      }
-  //    }
-  //  }
+  virtual double GetActionLaplacian(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
+  {
+    uint32_t skip = 1<<level;
+    double i_4_lambda_level_tau = i_4_lambda_tau/skip;
+    double tot = 0.;
+    vec<double> dr(path.GetND());
+    for (auto& p: particles) {
+      if (p.first == species) {
+        double gauss_prod, rho_free, dist;
+        std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
+        std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
+        while(bead_a != bead_b) {
+          std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
+          tot += path.GetND()*4.*i_4_lambda_level_tau-rho_free_splines[skip-1].GetLaplLogRhoFree(path.Dr(bead_a,next_bead_a));
+          bead_a = next_bead_a;
+        }
+      }
+    }
 
-  //  return tot;
-  //}
+    return tot;
+  }
 
-  virtual double GetActionLaplacian(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
-    double tot=0.;
-    const double ep=1e-6;
-    for(auto& p: particles){
-        std::shared_ptr<Bead> bead_b(species->GetBead(p.second,b1));
-        if(p.first == species){
-            for(int i=0;i<path.GetND();++i){
-                vec<double> eps=zeros<vec<double>>(path.GetND());
-                eps[i]=ep;
-                bead_b->SetR(bead_b->GetR()+eps*path.GetL());
-                tot+=(GetAction(b0,b1,particles,level));
-                bead_b->SetR(bead_b->GetR()-2*eps*path.GetL());
-                tot+=(GetAction(b0,b1,particles,level));
-                bead_b->SetR(bead_b->GetR()+eps*path.GetL());
-                tot-=2*GetAction(b0,b1,particles,level); 
-    }}}
-    return tot/(ep*ep);
+  virtual double GetActionLaplacian1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
+    uint32_t skip = 1<<level;
+    double i_4_lambda_level_tau = i_4_lambda_tau/skip;
+    const double ep=1e-3;
+    double tot =0.;
+    for (auto& p: particles) {
+      if (p.first == species) {
+        std::shared_ptr<Bead> bead_a(species->GetBead(p.second,b0));
+        std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
+        while(bead_a != bead_b) {
+          std::shared_ptr<Bead> next_bead_a(bead_a->GetNextBead(skip));
+          for(int i=0;i<path.GetND();++i){
+            vec<double>eps=zeros<vec<double>>(path.GetND());
+            eps(i)=ep;
+            tot -= (rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)+eps)+rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)-eps)-2*rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)))/(ep*ep);
+          }
+          bead_a = next_bead_a;
+        }
+      }
+    }
+
+    return 2*tot;
   }
   /// Write information about the action
   virtual void Write() {}
