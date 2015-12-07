@@ -154,7 +154,7 @@ public:
   virtual vec<double> GetActionGradient1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
     uint32_t skip = 1<<level;
     double i_4_lambda_level_tau = i_4_lambda_tau/skip;
-    const double ep=1e-4*(path.GetL()>1e-12 ? path.GetL() : 1.0);
+    const double ep=1e-4;
     vec<double> tot =zeros<vec<double>>(path.GetND());
     for (auto& p: particles) {
       if (p.first == species) {
@@ -201,7 +201,7 @@ public:
   virtual double GetActionLaplacian1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
     uint32_t skip = 1<<level;
     double i_4_lambda_level_tau = i_4_lambda_tau/skip;
-    const double ep=1e-3*(path.GetL()>1e-12 ? path.GetL() : 1.0);
+    const double ep=1e-3;
     double tot =0.;
     for (auto& p: particles) {
       if (p.first == species) {

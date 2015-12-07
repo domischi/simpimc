@@ -5,58 +5,106 @@ namespace Contact_Density_Optimization_Functions {
     extern int ND=3;
     extern int z_a=1;
     extern double l=-2;
-     
-    double f_simple(const double &mag_ri_RA){
+    extern double L=1.;
+    const int Images=2;
+   
+    double f_simple(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 1;
     }
     
     vec<double> gradient_f_simple(const double &mag_ri_RA, const vec<double> &ri_RA){
         return zeros<vec<double>>(ND);
     }
-    double laplace_f_simple(const double &mag_ri_RA){
+    double laplace_f_simple(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 0;
     }
 
-    double f_Assaraf(const double &mag_ri_RA){
+    double f_Assaraf(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 1. + 2*z_a*mag_ri_RA;
     }
     
     vec<double> gradient_f_Assaraf(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 2*z_a*(ri_RA/mag_ri_RA);
     }
-    double laplace_f_Assaraf(const double &mag_ri_RA){
+    double laplace_f_Assaraf(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 4*z_a/mag_ri_RA;
     }
     
-    double f_AssarafExp(const double &mag_ri_RA){
+    double f_AssarafExp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return (1. + 2*z_a*mag_ri_RA)*exp(l*mag_ri_RA);
     }
     
     vec<double> gradient_f_AssarafExp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA)*ri_RA/mag_ri_RA*(2*z_a+l+2*z_a*l*mag_ri_RA);
     }
-    double laplace_f_AssarafExp(const double &mag_ri_RA){
+    double laplace_f_AssarafExp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA)*(l*(2+l*mag_ri_RA)+2*z_a*(2+4*l*mag_ri_RA+l*l*mag_ri_RA*mag_ri_RA))/mag_ri_RA;
     }
     
-    double f_Squared(const double &mag_ri_RA){
+    double f_Squared(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 1+2*z_a*mag_ri_RA*mag_ri_RA;
     }
     vec<double> gradient_f_Squared(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 4*z_a*ri_RA;
     }
-    double laplace_f_Squared(const double &mag_ri_RA){
+    double laplace_f_Squared(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 3*4*z_a;
     }
 
-    double f_Exp(const double &mag_ri_RA){
+    double f_Exp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA);
     }
     vec<double> gradient_f_Exp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return l*exp(l*mag_ri_RA)*ri_RA/mag_ri_RA;
     }
-    double laplace_f_Exp(const double &mag_ri_RA){
+    double laplace_f_Exp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA)*l*(2+l*mag_ri_RA)/mag_ri_RA;
+    }
+
+    double f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
+        double tot=0.;
+        vec<double> Shift(3);
+        for(int i=-Images;i<=Images;++i)
+        for(int j=-Images;j<=Images;++j)
+        for(int k=-Images;k<=Images;++k){
+            Shift[0]=i*L;
+            Shift[1]=j*L;
+            Shift[2]=k*L;
+            vec<double> ri_RA_p=ri_RA+Shift;
+            double mag_ri_RA_p=norm(ri_RA_p);
+            tot+= exp(l*mag_ri_RA_p);
+        }
+        return tot;
+    }
+    vec<double> gradient_f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
+        vec<double> tot(zeros<vec<double>>(3));
+        vec<double> Shift(3);
+        for(int i=-Images;i<=Images;++i)
+        for(int j=-Images;j<=Images;++j)
+        for(int k=-Images;k<=Images;++k){
+            Shift[0]=i*L;
+            Shift[1]=j*L;
+            Shift[2]=k*L;
+            vec<double> ri_RA_p=ri_RA+Shift;
+            double mag_ri_RA_p=norm(ri_RA_p);
+            tot+=l*exp(l*mag_ri_RA_p)*ri_RA_p/mag_ri_RA_p;
+        }
+        return tot;
+    }
+    double laplace_f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
+        double tot=0.;
+        vec<double> Shift(3);
+        for(int i=-Images;i<=Images;++i)
+        for(int j=-Images;j<=Images;++j)
+        for(int k=-Images;k<=Images;++k){
+            Shift[0]=i*L;
+            Shift[1]=j*L;
+            Shift[2]=k*L;
+            vec<double> ri_RA_p=ri_RA+Shift;
+            double mag_ri_RA_p=norm(ri_RA_p);
+            tot+= exp(l*mag_ri_RA_p)*l*(2+l*mag_ri_RA_p)/mag_ri_RA_p;
+        }
+        return tot;
     }
 }
 
@@ -69,8 +117,6 @@ private:
     vec<int> n_measure_vol; ///< How many times the volume term at the i'th position gets measured
     vec<int> n_measure_b; ///< How many times the boundary term at the i'th position gets measured
     uint32_t z_a; ///< Charge of ion-like particle
-    //int nImages; ///< How many images to consider (in each direction, with -nImages,...,0,...,+nImages) in the accumulation if PBC is given
-    //int nImagesTot; ///< Totally, summed up spherically
     double lambda_tau; ///< the typical length of a path between two beads
     std::shared_ptr<Species> species_a; ///< ion species
     std::shared_ptr<Species> species_b; ///< other species 
@@ -79,9 +125,9 @@ private:
     std::vector<std::pair<uint32_t,uint32_t>> particle_pairs; ///< contains all the pairs of particles of species_a and species_b
     size_t n_particle_pairs;
     std::string Optimization_Strategy;
-    double (*Function_f)(const double &mag_ri_RA); ///< Function pointer for the possible generalization
+    double (*Function_f)(const double &mag_ri_RA, const vec<double> &ri_RA); ///< Function pointer for the possible generalization
     vec<double> (*Function_gradient_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
-    double (*Function_laplace_f)(const double &mag_ri_RA);
+    double (*Function_laplace_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     
     vec<double> getRelevantNormalVector(vec<double> r1,vec<double> r2){
         vec<double> n(zeros<vec<double>>(path.GetND())); 
@@ -138,56 +184,41 @@ private:
                 Direction=Direction/norm(Direction);
                 //Histogram loop
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
-                    double vol_tmp=0;
-                    double bound_tmp=0;
-                    //bool SaveVol=true;
-                    //bool SaveBound=true;
-                    //for(int n1=-nImages;n1<nImages;++n1)
-                    //for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
-                    //for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
-                    {
-                        vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                        vec<double> RImage(path.GetND());
-                        //RImage.fill(path.GetL());
-                        //RImage[0]*=n1;
-                        //RImage[1]*=n2;
-                        //RImage[2]*=n3;
-                        vec<double> R=path.Dr(RA,Rhist);//+RImage;
-                        // Get differences
-                        vec<double> ri_R(path.Dr(ri,R));
-                        double mag_ri_R = mag(ri_R);
-                        if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
-                            //SaveVol=false;
-                            //SaveBound=false;
-                            continue;
-                        }
-                        //Compute functions
-                        double f= Function_f(mag_ri_R);
-                        vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
-                        double laplacian_f = Function_laplace_f(mag_ri_R);
-                        // Volume Term
-                        vol_tmp+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
-                        //Boundary Term
-                        if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
-                            vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                            if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
-                                //SaveBound=false;
-                                continue;
-                            vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
-                            //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
-                            //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                            //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
-                            bound_tmp+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
-                        }
+                    vec<double> Rhist=gr_vol.x.rs(i)*Direction;
+                    vec<double> RImage(path.GetND());
+                    vec<double> R=path.Dr(RA,Rhist);
+                    // Get differences
+                    vec<double> ri_R(path.Dr(ri,R));
+                    double mag_ri_R = mag(ri_R);
+                    if(mag_ri_R<1e-6||abs(laplacian_action)>1e3){//possibly dividing by near zero, big numerical instabilities therefore skip 
+                        continue;
                     }
-                    //if(SaveVol){
-                        tot_vol(i)+=vol_tmp;
-                        ++n_measure_vol(i);
+                    //Compute functions
+                    double f= Function_f(mag_ri_R, ri_R);
+                    vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
+                    double laplacian_f = Function_laplace_f(mag_ri_R, ri_R);
+                    // Volume Term
+                    //if(i==0){ 
+                    //    std::cout << Optimization_Strategy<< " "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<" "<<laplacian_action<<" "<<mag_ri_R<<std::endl;
+                    //    for (auto& action: action_list) {
+                    //        std::cout << action->name<<"\t"<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<std::endl;
+                    //    }
+                    //    std::cout <<"-------------------------------\n";
                     //}
-    	            //if(SaveBound){
-                        tot_b(i)+=bound_tmp;
-                        ++n_measure_b(i);
-                    //}
+                    tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                    //Boundary Term
+                    if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
+                        vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
+                        if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                            continue;
+                        vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
+                        //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
+                        //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
+                        //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
+                        tot_b(i)+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
+                    }
+                    ++n_measure_vol(i);
+                    ++n_measure_b(i);
                 }//End of hist loop
             }
         }
@@ -268,20 +299,11 @@ public:
                     particle_pairs.push_back(std::make_pair(p_i,p_j));
         }
         n_particle_pairs = particle_pairs.size();
-        //Choose the number of Images to consider
-        //if(path.GetPBC()) 
-        //    nImages=3; 
-        //else 
-        //    nImages=0;
-        //nImagesTot=0;
-        //for(int n1=-nImages;n1<nImages;++n1)
-        //    for(int n2=-floor(sqrt(nImages*nImages-n1*n1));n2<=ceil(sqrt(nImages*nImages-n1*n1));++n2)
-        //        for(int n3=-floor(sqrt(nImages*nImages-n1*n1-n2*n2));n3<=ceil(sqrt(nImages-n1*n1-n2*n2));++n3)
-        //            ++nImagesTot;
         //Choose the optimization stategy
         Optimization_Strategy = in.GetAttribute<std::string>("optimization_strategy");
         Contact_Density_Optimization_Functions::ND=path.GetND();
         Contact_Density_Optimization_Functions::z_a=z_a;
+        Contact_Density_Optimization_Functions::L=path.GetL();
         if(Optimization_Strategy=="Simple"){
             Function_f=&Contact_Density_Optimization_Functions::f_simple; 
             Function_gradient_f=&Contact_Density_Optimization_Functions::gradient_f_simple;
