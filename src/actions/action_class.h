@@ -46,9 +46,11 @@ public:
 
   /// Returns the spatial gradient of the action between time slices b0 and b1 for a vector of particles
   virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level) { return zeros<vec<double>>(path.GetND()); };
+  virtual vec<double> GetActionGradient1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level) { return GetActionGradient(b0,b1,particles,level); };
 
   /// Returns the spatial laplacian of the action between time slices b0 and b1 for a vector of particles
   virtual double GetActionLaplacian(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level) { return 0.; };
+  virtual double GetActionLaplacian1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level) { return GetActionLaplacian(b0,b1,particles,level); };
 
   /// Returns the potential of the action for the whole path
   virtual double Potential() { return 0.; };
