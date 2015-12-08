@@ -198,14 +198,17 @@ private:
                     vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                     double laplacian_f = Function_laplace_f(mag_ri_R, ri_R);
                     // Volume Term
-                    //if(i==0){ 
+                    //if(i==0&& b_i==0){ 
                     //    std::cout << Optimization_Strategy<< " "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<" "<<laplacian_action<<" "<<mag_ri_R<<std::endl;
                     //    for (auto& action: action_list) {
-                    //        std::cout << action->name<<"\t"<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<std::endl;
+                    //        std::cout << action->name<<"\t"<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<"\t"<<action->GetAction(b_i,b_i+1,only_ri,0)<<std::endl;
                     //    }
                     //    std::cout <<"-------------------------------\n";
                     //}
+                    //if(i==0&&b_i==0)
+                    //    std::cout << Optimization_Strategy<<" "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<< " magrira"<<mag_ri_R<<" f" <<f<< " ngf="<<norm(gradient_f)<<" lapf="<<laplacian_f<<" nga="<<norm(gradient_action)<<" lapla="<<laplacian_action<<std::endl; 
                     tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                    ++n_measure_vol(i);
                     //Boundary Term
                     if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
                         vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
@@ -216,9 +219,8 @@ private:
                         //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                         //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
                         tot_b(i)+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
+                        ++n_measure_b(i);
                     }
-                    ++n_measure_vol(i);
-                    ++n_measure_b(i);
                 }//End of hist loop
             }
         }
