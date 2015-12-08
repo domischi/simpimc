@@ -200,7 +200,8 @@ public:
         std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
         while(bead_a != bead_b) {
           std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
-          tot += path.GetND()*4.*i_4_lambda_level_tau-rho_free_splines[skip-1].GetLaplLogRhoFree(path.Dr(bead_a,next_bead_a));
+          //The 2 in the image part comes from the two beads that are affected by a move of one bead, this generates twice the amount of laplacian instead of only one
+          tot += path.GetND()*4.*i_4_lambda_level_tau-2*rho_free_splines[skip-1].GetLaplLogRhoFree(path.Dr(bead_a,next_bead_a));
           bead_a = next_bead_a;
         }
       }
@@ -228,8 +229,7 @@ public:
           bead_a = next_bead_a;
         }
       }
-    }
-
+    }    
     return 2*tot;
   }
   /// Write information about the action
