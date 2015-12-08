@@ -47,7 +47,7 @@ public:
       double r = r_grid.start + i*dr;
       double r_2 = r*r;
       double r_2_i_4_lambda_tau = r_2*i_4_lambda_tau;
-      for (uint32_t image=1; image<=n_images; image++) {
+      for (uint32_t image=n_images; image>=1; --image) {
         double r_p(r+image*t_l);
         double r_p_2_i_4_lambda_tau = r_p*r_p*i_4_lambda_tau;
         double d_r_2_r_p_2_i_4_lambda_tau = r_2_i_4_lambda_tau - r_p_2_i_4_lambda_tau;
