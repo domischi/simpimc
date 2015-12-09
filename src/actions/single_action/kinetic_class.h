@@ -131,11 +131,11 @@ public:
   // Returns the spatial gradient of the action between time slices b0 and b1 for a vector of particles
   virtual vec<double> GetActionGradient(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level)
   {
-    //std::cout << "-------------------------------------------------------------"<<std::endl;
     uint32_t skip = 1<<level;
     double i_4_lambda_level_tau = i_4_lambda_tau/skip;
     vec<double> tot(zeros<vec<double>>(path.GetND()));
-    vec<double> tmp(zeros<vec<double>>(path.GetND()));
+    vec<double> tmp1(zeros<vec<double>>(path.GetND()));
+    vec<double> tmp2(zeros<vec<double>>(path.GetND()));
     for (auto& p: particles) {
       if (p.first == species) {
         double gauss_prod, rho_free, dist;
@@ -143,13 +143,13 @@ public:
         std::shared_ptr<Bead> bead_b(bead_a->GetNextBead(b1-b0));
         while(bead_a != bead_b) {
           std::shared_ptr<Bead> next_bead_a = bead_a->GetNextBead(skip);
-          rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp);
-          //std::cout<<"--------------"<<std::endl;
-          tot += -tmp+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
-          //std::cout << "in wo no with direct image estimate\n"<<2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
-          //std::cout << "in wo no with first part image estimate\n"<<2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a))<<std::endl;
-          //std::cout << "in wo no with second part image estimate\n"<<2*i_4_lambda_tau*(-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
-          //std::cout<<"--------------"<<std::endl;
+          std::shared_ptr<Bead> prev_bead_a(bead_a->GetPrevBead(skip));
+          rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp1);
+          rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(prev_bead_a,bead_a),tmp2);
+          tot += -tmp1+tmp2+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
+          //std::cout << "analytic direct image\n"<<2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
+          //std::cout << "analytic image\n"<<-tmp1+tmp2<<std::endl;
+          //std::cout << "analytic tot\n"<<-tmp1+tmp2+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
           bead_a = next_bead_a;
         }
       }
@@ -159,7 +159,8 @@ public:
   virtual vec<double> GetActionGradient1(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level){
     uint32_t skip = 1<<level;
     double i_4_lambda_level_tau = i_4_lambda_tau/skip;
-    const double ep=1e-8;
+    vec<double> tmp(zeros<vec<double>>(path.GetND()));
+    for(double ep=1e-4;ep>=9e-7;ep/=10.){
     vec<double> tot(zeros<vec<double>>(path.GetND()));
     for (auto& p: particles) {
       if (p.first == species) {
@@ -174,16 +175,15 @@ public:
             tot(i) -= (rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)+eps)-rho_free_splines[skip-1].GetLogRhoFree(path.Dr(bead_a,next_bead_a)))/ep;
             tot(i) += (rho_free_splines[skip-1].GetLogRhoFree(path.Dr(prev_bead_a,bead_a)+eps)-rho_free_splines[skip-1].GetLogRhoFree(path.Dr(prev_bead_a,bead_a)))/ep;
           }
-          //std::cout<<"--------------"<<std::endl;
-          //std::cout <<"in 1 with tot=\n"<<tot<<std::endl;
+          //std::cout <<"numeric tot w ep" <<ep<<"\n"<<tot<<std::endl;
           bead_a = next_bead_a;
-          //std::cout<<"--------------"<<std::endl;
-          //std::cout<<"-----------------------------------------------------"<<std::endl;
+          tmp=tot;
         }
       }
     }
-
-    return tot;
+    }
+    return tmp;
+    //return tot;
   }
 
   /// Returns the spatial laplacian of the action between time slices b0 and b1 for a vector of particles

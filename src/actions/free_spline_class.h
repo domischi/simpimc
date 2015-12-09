@@ -129,10 +129,11 @@ public:
   double GetGradLogRhoFree(const vec<double> &r, vec<double> &grad_log_rho_free)
   {
     double tot = 0.;
+    grad_log_rho_free=zeros<vec<double>>(r.size());
     for (uint32_t d_i=0; d_i<r.size(); d_i++) {
       double image_action, d_image_action_d_r;
       eval_UBspline_1d_d_vg(image_action_spline,r(d_i),&image_action,&d_image_action_d_r);
-      grad_log_rho_free(d_i) = -d_image_action_d_r;
+      grad_log_rho_free(d_i) -= d_image_action_d_r;
       tot -= image_action;
     }
     //grad_log_rho_free -= r*2.*i_4_lambda_tau;
