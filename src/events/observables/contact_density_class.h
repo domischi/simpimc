@@ -6,7 +6,7 @@ namespace Contact_Density_Optimization_Functions {
     extern int z_a=1;
     extern double l=-2;
     extern double L=1.;
-    const int Images=2;
+    const int Images=6;
    
     double f_simple(const double &mag_ri_RA, const vec<double> &ri_RA){
         return 1;
@@ -135,7 +135,7 @@ private:
             if(r1[d]<-0.4*path.GetL()&&r2[d]>0.4*path.GetL()) {
                   n[d]=-1;
             }
-        else if(r2[d]<-0.4*path.GetL()&&r1[d]>0.4*path.GetL()) {
+            else if(r2[d]<-0.4*path.GetL()&&r1[d]>0.4*path.GetL()) {
                 n[d]=1;
             }
         }
@@ -164,14 +164,13 @@ private:
                 vec<double> ri2 = species_b->GetBead(particle_pairs[pp_i].second,b_i)->GetNextBead(1)->GetR();
                 vec<double> ri_RA(path.Dr(ri,RA));
                 vec<double> ri_RA2(path.Dr(ri2,RA));
-                vec<double> ri_ri2(path.Dr(ri,ri2));
                 // Sum over actions for ri
                 std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> only_ri{std::make_pair(species_b,particle_pairs[pp_i].second)};
                 vec<double> gradient_action(zeros<vec<double>>(path.GetND()));
                 double laplacian_action = 0.;
                 for (auto& action: action_list) {
-                    vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
-                    vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
+                    //vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
+                    //vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
                     gradient_action += action->GetActionGradient(b_i,b_i+1,only_ri,0);
                     //double lapl0=action->GetActionLaplacian(b_i,b_i+1,only_ri,0);
                     //double lapl1=action->GetActionLaplacian1(b_i,b_i+1,only_ri,0);
@@ -179,17 +178,19 @@ private:
                     //if(abs(lapl1-lapl0)>1e-12) {
                     //    std::cout << "---------------------\nin CD, different lapl for "<<action->name<<", lapl0="<<lapl0<<"\tlapl1="<<lapl1<<"\tabs="<<abs(lapl1-lapl0)<<std::endl;
                     //}
-                    if(norm(grad0-grad1)>1e-4) {
-                        std::cout << "------------------------------\nin CD, different grad for "<<action->name<<", norm(grad0-grad1)="<<norm(grad0-grad1)<<std::endl;
+                    //if((action->name=="Kinetic"||action->name=="KineticE"||action->name=="KineticP")) std::cout <<"Action for "<< action->name<<": norm_grad="<<norm(action->GetActionGradient(b_i,b_i+1,only_ri,0))<<"\tlapl="<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<std::endl;
+                    //if(norm(grad0-grad1)>1e-4) {
+                    //    std::cout << "------------------------------\nin CD, different grad for "<<action->name<<", norm(grad0-grad1)="<<norm(grad0-grad1)<<std::endl;
                     //    vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
                     //    std::cout << "........................."<<std::endl;
                     //    vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
                     //    std::cout << "------------------------------"<<std::endl;
-                    }
+                    //}
                 }
                 vec<double> Direction(path.GetND());
-                Direction.randn();
-                Direction=Direction/norm(Direction);
+                //Direction.randn();
+                //Direction=Direction/norm(Direction);
+                Direction[0]=1.;
                 //Histogram loop
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     vec<double> Rhist=gr_vol.x.rs(i)*Direction;
@@ -198,7 +199,7 @@ private:
                     // Get differences
                     vec<double> ri_R(path.Dr(ri,R));
                     double mag_ri_R = mag(ri_R);
-                    if(mag_ri_R<1e-6||abs(laplacian_action)>1e3){//possibly dividing by near zero, big numerical instabilities therefore skip 
+                    if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
                         continue;
                     }
                     //Compute functions
@@ -206,28 +207,22 @@ private:
                     vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                     double laplacian_f = Function_laplace_f(mag_ri_R, ri_R);
                     // Volume Term
-                    //if(i==0&& b_i==0){ 
-                    //    std::cout << Optimization_Strategy<< " "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<" "<<laplacian_action<<" "<<mag_ri_R<<std::endl;
-                    //    for (auto& action: action_list) {
-                    //        std::cout << action->name<<"\t"<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<"\t"<<action->GetAction(b_i,b_i+1,only_ri,0)<<std::endl;
-                    //    }
-                    //    std::cout <<"-------------------------------\n";
-                    //}
-                    //if(i==0&&b_i==0)
-                    //    std::cout << Optimization_Strategy<<" "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<< " magrira"<<mag_ri_R<<" f" <<f<< " ngf="<<norm(gradient_f)<<" lapf="<<laplacian_f<<" nga="<<norm(gradient_action)<<" lapla="<<laplacian_action<<std::endl; 
                     tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                     ++n_measure_vol(i);
                     //Boundary Term
                     if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
                         vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                        if(mag_ri_R<1e-5)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                        if(mag_ri_R<1e-8)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
-                        vec<double> IntegrandVector=f*pow(mag_ri_R,-3)*ri_R+(f*gradient_action-gradient_f)/mag_ri_R;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
+                        vec<double> IntegrandVector=f*pow(mag_ri_R,-2)*ri_R+f*gradient_action-gradient_f;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                         //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                         //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                        //bound_tmp+= (-1./(4*M_PI))*VolumeFactor*dot(IntegrandVector,NormalVector);
-                        tot_b(i)+= (-1./(4*M_PI))*dot(IntegrandVector,NormalVector);
+                        tot_b(i)+= (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
+                        //std::cout << (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,f*pow(mag_ri_R,-2)*ri_R)<<"\t"<< (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,f*gradient_action)<<"\t"<< (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,-gradient_f)<<"\t"<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<std::endl;
                         ++n_measure_b(i);
+                        //Op strat, r, vol, bound, tot
+                        //if(b_i==0 && pp_i==0 && (i==0||i==1)) std::cout<<Optimization_Strategy<<" "<<gr_vol.x.rs(i)<<" "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<" "<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<" "<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)+(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<std::endl;
+
                     }
                 }//End of hist loop
             }
@@ -267,7 +262,6 @@ public:
         int n_r = in.GetAttribute<double>("n_r",1000);
         gr_vol.x.CreateGrid(r_min,r_max,n_r);
         gr_vol.y.zeros(n_r);
-        //gr_b.x.CreateGridMiddle(r_min,r_max,n_r);
         gr_b.x.CreateGrid(r_min,r_max,n_r);
         gr_b.y.zeros(n_r);
         //Write things to file
@@ -343,6 +337,7 @@ public:
             std::cout << "ERROR: unrecognized optimization strategy in contact density, please check again"<< std::endl;
             assert(false);
         }
+        assert(Function_f(0,zeros<vec<double>>(path.GetND()))==1);
         Reset();
     }
 
@@ -358,7 +353,7 @@ public:
                 norm_vol = n_measure_vol[i]/species_a->GetNPart();
                 gr_vol.y(i) = gr_vol.y(i)/(norm_vol);
                 if(path.GetPBC()&&n_measure_b(i)!=0){//If we do not have pbc then we just save 0, otherwise similar to volume term
-                    norm_b = n_measure_b[i]/species_a->GetNPart();
+                    norm_b = n_measure_b[i]/(species_a->GetNPart());
                     gr_b.y(i) = gr_b.y(i)/(norm_b);
                 }
                 tot(i)=gr_vol.y(i)+gr_b.y(i);

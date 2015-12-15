@@ -147,9 +147,6 @@ public:
           rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(bead_a,next_bead_a),tmp1);
           rho_free_splines[skip-1].GetGradLogRhoFree(path.Dr(prev_bead_a,bead_a),tmp2);
           tot += -tmp1+tmp2+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a));
-          //std::cout << "analytic direct image\n"<<2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
-          //std::cout << "analytic image\n"<<-tmp1+tmp2<<std::endl;
-          //std::cout << "analytic tot\n"<<-tmp1+tmp2+2*i_4_lambda_tau*(path.Dr(bead_a,next_bead_a)-path.Dr(bead_a->GetPrevBead(skip),bead_a))<<std::endl;
           bead_a = next_bead_a;
         }
       }
