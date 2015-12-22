@@ -129,22 +129,44 @@ private:
     vec<double> (*Function_gradient_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     double (*Function_laplace_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     
-    vec<double> getRelevantNormalVector(vec<double> r1,vec<double> r2){
+    
+    vec<double> getRelevantNormalVector2(vec<double> r1){
         vec<double> n(zeros<vec<double>>(path.GetND()));
         for(int d=0;d<path.GetND();++d){
-            if((r1[d]<-(path.GetL()/2-2*lambda_tau))&&(r2[d]>(path.GetL()/2-2*lambda_tau))) {
-                  n[d]=-1;
+            if(r1[d]<-(path.GetL()/2-lambda_tau))
+                //n[d]=1.;
+                n[d]=-1.;
+            else if(r1[d]>(path.GetL()/2-lambda_tau))
+                n[d]=1.;
+        }
+        return n;
+    }
+    vec<double> getRelevantNormalVector(const vec<double> &r1,const vec<double> &r2){
+        vec<double> n(zeros<vec<double>>(path.GetND()));
+        for(int d=0;d<path.GetND();++d){
+            //if((r1[d]<-(path.GetL()/2-2*lambda_tau))&&(r2[d]>(path.GetL()/2-2*lambda_tau))) {
+            if((r1[d]<-(path.GetL()/2-1*lambda_tau))&&(r2[d]>(path.GetL()/2-1*lambda_tau))) {
+                n[d]=-1;
             }
-            else if((r2[d]<-(path.GetL()/2-2*lambda_tau))&&(r1[d]>(path.GetL()/2-2*lambda_tau))) {
+            //else if((r2[d]<-(path.GetL()/2-2*lambda_tau))&&(r1[d]>(path.GetL()/2-2*lambda_tau))) {
+            else if((r2[d]<-(path.GetL()/2-1*lambda_tau))&&(r1[d]>(path.GetL()/2-1*lambda_tau))) {
                 n[d]=1;
             }
         }
         return n;
-      }
-    bool BE(vec<double> r1, vec<double> r2) {
+    }
+    bool BE(const vec<double> &r1, const vec<double> &r2) {
         int nd=r1.n_elem;
         for(int i =0;i<nd;++i)
-            if((r1[i]<-(path.GetL()/2-2*lambda_tau)&&r2[i]>(path.GetL()/2-2*lambda_tau))||(r2[i]<-(path.GetL()/2-2*lambda_tau)&&r1[i]>(path.GetL()/2-2*lambda_tau)))
+            //if((r1[i]<-(path.GetL()/2-2*lambda_tau)&&r2[i]>(path.GetL()/2-2*lambda_tau))||(r2[i]<-(path.GetL()/2-2*lambda_tau)&&r1[i]>(path.GetL()/2-2*lambda_tau)))
+            if((r1[i]<-(path.GetL()/2-1*lambda_tau)&&r2[i]>(path.GetL()/2-1*lambda_tau))||(r2[i]<-(path.GetL()/2-1*lambda_tau)&&r1[i]>(path.GetL()/2-1*lambda_tau)))
+                return true;
+        return false;
+    }
+    bool BE2(vec<double> r1) {
+        int nd=r1.n_elem;
+        for(int i =0;i<nd;++i)
+            if((r1[i]<-(path.GetL()/2-1*lambda_tau))||(r1[i]>(path.GetL()/2-1*lambda_tau)))
                 return true;
         return false;
     }
@@ -189,12 +211,12 @@ private:
                     //}
                 }
                 vec<double> Direction(path.GetND());
-                //Direction.randn();
+                Direction.randn();
                 Direction=Direction/norm(Direction);
                 //Histogram loop
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                    vec<double> RImage(path.GetND());
+                    //vec<double> RImage(path.GetND());
                     vec<double> R=path.Dr(RA,Rhist);
                     // Get differences
                     vec<double> ri_R(path.Dr(ri,R));
@@ -210,19 +232,21 @@ private:
                     tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                     ++n_measure_vol(i);
                     //Boundary Term
-                    if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
-                        vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                        if(mag_ri_R<1e-8)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                    //if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
+                    if(BE2(ri_RA)&&path.GetPBC()) {
+                        //vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
+                        vec<double> NormalVector=getRelevantNormalVector2(ri_RA);
+                        if(mag_ri_R<1e-8||norm(NormalVector)!=1.)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
                         vec<double> IntegrandVector=f*pow(mag_ri_R,-2)*ri_R+f*gradient_action-gradient_f;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                         //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                         //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                        tot_b(i)+= (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
-                        //std::cout << (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,f*pow(mag_ri_R,-2)*ri_R)<<"\t"<< (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,f*gradient_action)<<"\t"<< (-1./(4.*M_PI*mag_ri_R))*dot(NormalVector,-gradient_f)<<"\t"<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<std::endl;
+                        //tot_b(i)+= (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
+                        tot_b(i) += (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
+                        //if(i==0) std::cout << Optimization_Strategy<<" "<<tot_vol(i)<<" "<<tot_b(i)<<std::endl;
                         ++n_measure_b(i);
-                        //Op strat, r, vol, bound, tot
-                        //if(b_i==0 && pp_i==0 && (i==0||i==1)) std::cout<<Optimization_Strategy<<" "<<gr_vol.x.rs(i)<<" "<<(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<" "<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<" "<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)+(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action))<<std::endl;
-
+                        //std::cout << n_measure_b(i)<<std::endl;
+                        //std::cout <<norm(NormalVector)<<"\t"<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<std::endl;
                     }
                 }//End of hist loop
             }
