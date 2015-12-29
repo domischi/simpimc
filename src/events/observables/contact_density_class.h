@@ -129,6 +129,82 @@ private:
     vec<double> (*Function_gradient_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     double (*Function_laplace_f)(const double &mag_ri_RA, const vec<double> &ri_RA);
     
+    NUgrid* SplineGrid; ///< Grid for the spline of the relevant terms
+    NUBspline_3d_d* Spline_i_mag_R; ///< takes the spline for 1/|R|
+    NUBspline_3d_d* Spline_R_div_mag_R_s0; ///< takes the spline for the first component of R/|R|^2
+    NUBspline_3d_d* Spline_R_div_mag_R_s1; ///< takes the spline for the second component of R/|R|^2
+    NUBspline_3d_d* Spline_R_div_mag_R_s2; ///< takes the spline for the third component of R/|R|^2
+
+    void SetupSpline(){
+        int nImages=(path.GetPBC() ? 3 : 0);
+        BCtype_d SplineType={NATURAL,NATURAL}; //HACK?
+        std::vector<double> GridPoints{1e-5};
+        if(path.GetPBC()){
+            while(GridPoints.back()<path.GetL())//Create logarithmic space (at the origin the function will fluctuate more)
+                GridPoints.push_back(GridPoints.back()*1.1);
+            }
+        else{
+            while(GridPoints.back()<1000.)
+                GridPoints.push_back(GridPoints.back()*1.1);
+        }
+        int nSplinePoints(GridPoints.size());
+        SplineGrid=create_general_grid(GridPoints.data(),nSplinePoints);//Initalizes the einspline container
+        
+        std::vector<double> i_mag_R;
+        std::vector<double> R_div_mag_R_s0;
+        std::vector<double> R_div_mag_R_s1;
+        std::vector<double> R_div_mag_R_s2;
+        for(int n0=0;n0<nSplinePoints;++n0)
+        for(int n1=0;n1<nSplinePoints;++n1)//TODO not only for 3 dimensions
+        for(int n2=0;n2<nSplinePoints;++n2){//Calculate the relevant things for each spline point
+            vec<double> r(path.GetND());
+            r[0]=GridPoints[n0];
+            r[1]=GridPoints[n1];
+            r[2]=GridPoints[n2];
+            double i_mag_R_loc(0);
+            vec<double> R_div_mag_R_s_loc(zeros<vec<double>>(path.GetND())); // R/|R|^2
+            for(int m0=-nImages;m0<=nImages;++m0)
+            for(int m1=-nImages;m1<=nImages;++m1)
+            for(int m2=-nImages;m2<=nImages;++m2){
+                vec<double> L(path.GetND());
+                L[0]=m0*path.GetL();
+                L[1]=m1*path.GetL();
+                L[2]=m2*path.GetL();
+                i_mag_R_loc+=1./norm(r+L);
+                R_div_mag_R_s_loc+=(r+L)/(norm(r+L)*norm(r+L));
+            }
+            //std::cout << "i mag r loc="<<i_mag_R_loc<<"\tnorm r="<<norm(r)<<std::endl;
+            i_mag_R.push_back(i_mag_R_loc);
+            R_div_mag_R_s0.push_back(R_div_mag_R_s_loc[0]);
+            R_div_mag_R_s1.push_back(R_div_mag_R_s_loc[1]);
+            R_div_mag_R_s2.push_back(R_div_mag_R_s_loc[2]);
+        }
+
+        Spline_i_mag_R=create_NUBspline_3d_d(SplineGrid,SplineGrid,SplineGrid,SplineType,SplineType,SplineType, i_mag_R.data());
+        Spline_R_div_mag_R_s0=create_NUBspline_3d_d(SplineGrid,SplineGrid,SplineGrid,SplineType,SplineType,SplineType, R_div_mag_R_s0.data());
+        Spline_R_div_mag_R_s1=create_NUBspline_3d_d(SplineGrid,SplineGrid,SplineGrid,SplineType,SplineType,SplineType, R_div_mag_R_s1.data());
+        Spline_R_div_mag_R_s2=create_NUBspline_3d_d(SplineGrid,SplineGrid,SplineGrid,SplineType,SplineType,SplineType, R_div_mag_R_s2.data());
+    }
+   
+    double GetVolumeTerm(const vec<double>& ri_R, const double& f, const vec<double>& gradient_f, const double& laplacian_f, const vec<double>& gradient_action, const double& laplacian_action ){ //Constructs the volume term with the spline
+
+        double i_mag_ri_R=1.;
+        eval_NUBspline_3d_d(Spline_i_mag_R,std::abs(ri_R[0]),std::abs(ri_R[1]),std::abs(ri_R[2]),&i_mag_ri_R);
+        //if(std::abs(mag_ri)) std::cout << "Debug "<<mag_ri_R<<"\t"<<1/norm(ri_R)<<std::endl;
+        //return (-1./(norm(ri_R)*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+        return (-i_mag_ri_R/(4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+    }
+    
+    double GetBoundaryTerm(const vec<double>& ri_R, const double& f, const vec<double>& gradient_f, const double& laplacian_f, const vec<double>& gradient_action, const double& laplacian_action, const vec<double>& NormalVector){ //Constructs the volume term with the spline
+        vec<double> R_div_mag_R_s(path.GetND());
+        eval_NUBspline_3d_d(Spline_R_div_mag_R_s0,ri_R[0],ri_R[1],ri_R[2],&R_div_mag_R_s[0]);
+        eval_NUBspline_3d_d(Spline_R_div_mag_R_s1,ri_R[0],ri_R[1],ri_R[2],&R_div_mag_R_s[1]);
+        eval_NUBspline_3d_d(Spline_R_div_mag_R_s2,ri_R[0],ri_R[1],ri_R[2],&R_div_mag_R_s[2]);
+        vec<double> IntegrandVector=f*R_div_mag_R_s+f*gradient_action-gradient_f;
+        double mag_ri_R;
+        eval_NUBspline_3d_d(Spline_i_mag_R,ri_R[0],ri_R[1],ri_R[2],&mag_ri_R);
+        return (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
+    }
     
     vec<double> getRelevantNormalVector2(vec<double> r1){
         vec<double> n(zeros<vec<double>>(path.GetND()));
@@ -180,6 +256,7 @@ private:
         vec<double> tot_b(zeros<vec<double>>(gr_vol.x.n_r)); //Save the values for the boundary terms in here
         for (uint32_t pp_i=0; pp_i<n_particle_pairs; ++pp_i) {
             for (uint32_t b_i=0; b_i<path.GetNBead(); ++b_i) {
+                vec<double> L(path.GetND());
                 // Set r's
                 vec<double> RA = species_a->GetBead(particle_pairs[pp_i].first,b_i)->GetR();
                 vec<double> RA2 = species_a->GetBead(particle_pairs[pp_i].first,b_i)->GetNextBead(1)->GetR();
@@ -220,6 +297,7 @@ private:
                     vec<double> R=path.Dr(RA,Rhist);
                     // Get differences
                     vec<double> ri_R(path.Dr(ri,R));
+                    //vec<double> ri_R(path.Dr(ri,R));
                     double mag_ri_R = mag(ri_R);
                     if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
                         continue;
@@ -229,27 +307,29 @@ private:
                     vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                     double laplacian_f = Function_laplace_f(mag_ri_R, ri_R);
                     // Volume Term
-                    tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                    //tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
+                    tot_vol(i)+=GetVolumeTerm(ri_R, f, gradient_f, laplacian_f, gradient_action, laplacian_action);
                     ++n_measure_vol(i);
                     //Boundary Term
-                    //if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
-                    if(BE2(ri_RA)&&path.GetPBC()) {
+                    if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
+                    //if(BE2(ri_RA)&&path.GetPBC()) {
                         //vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                        vec<double> NormalVector=getRelevantNormalVector2(ri_RA);
+                        vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
                         if(mag_ri_R<1e-8||norm(NormalVector)!=1.)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
-                        vec<double> IntegrandVector=f*pow(mag_ri_R,-2)*ri_R+f*gradient_action-gradient_f;//Compare calculation in "Calculation_Density_Estimator.pdf" Eq. (17)
                         //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
                         //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
                         //tot_b(i)+= (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
-                        tot_b(i) += (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
+                        
+                        tot_b(i) += GetBoundaryTerm(ri_R, f, gradient_f, laplacian_f, gradient_action, laplacian_action, NormalVector);
                         //if(i==0) std::cout << Optimization_Strategy<<" "<<tot_vol(i)<<" "<<tot_b(i)<<std::endl;
                         ++n_measure_b(i);
                         //std::cout << n_measure_b(i)<<std::endl;
                         //std::cout <<norm(NormalVector)<<"\t"<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<std::endl;
                     }
                 }//End of hist loop
-            }
+			//}//End images loop
+            }//End of bead loop
         }
         double cofactor = path.GetSign()*path.GetImportanceWeight();
         for (uint32_t i=0;i<gr_vol.x.n_r;++i){
@@ -362,6 +442,8 @@ public:
             assert(false);
         }
         assert(Function_f(0,zeros<vec<double>>(path.GetND()))==1);
+        std::cout << "Setting up splines for Contact Density "<<Optimization_Strategy<<"..."<<std::endl;
+        SetupSpline();
         Reset();
     }
 
