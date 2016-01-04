@@ -152,9 +152,13 @@ protected:
       b->SetR(d_i,r0(d_i) + eps);
       path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       double f1 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
+      //if(use_long_range)
+      //  f1+=CalcULong(b_i,b_j,level)
       b->SetR(d_i,r0(d_i) - eps);
       path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       double f2 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
+      //if(use_long_range)
+      //  f2+=CalcULong(b_i,b_j,level)
       tot(d_i) = (f1-f2)/(2.*eps);
       b->SetR(d_i,r0(d_i));
     }
@@ -188,10 +192,14 @@ protected:
     double tot = 0.;
     path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
     double f0 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
+    if(use_long_range)
+      f0+=CalcULong(b_i,b_j,level);
     for (uint32_t d_i=0; d_i<path.GetND(); ++d_i) {
       b->SetR(d_i,r0(d_i) + eps);
       path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       double fp1 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
+      if(use_long_range)
+          fp1+=CalcULong(b_i,b_j,level);
       //b->SetR(d_i,r0(d_i) + 2*eps);
       //path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       //double fp2 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
@@ -199,6 +207,8 @@ protected:
       path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       double fm1 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
       //b->SetR(d_i,r0(d_i) - 2*eps);
+      if(use_long_range)
+          fm1+=CalcULong(b_i,b_j,level);
       //path.DrDrpDrrp(b_i,b_j,species_a,species_b,p_i,p_j,r_mag,r_p_mag,r_r_p_mag);
       //double fm2 = CalcU(r_mag,r_p_mag,r_r_p_mag,level);
       //f''=(-f(+2h)+16f(+1h)-30f(0h)+16f(-1h)-f(-2h))/12h^2+O(h^4)
@@ -325,7 +335,7 @@ public:
     // Generate particle pairs
     std::vector<uint32_t> particles_a, particles_b;
     std::vector<std::pair<uint32_t,uint32_t>> particle_pairs;
-    GenerateParticlePairs(particles, particles_a, particles_b, particle_pairs); // FIXME: this is wrong for helium contact density
+    GenerateParticlePairs(particles, particles_a, particles_b, particle_pairs); 
     if (particle_pairs.size() == 0)
       return zero_vec;
 
