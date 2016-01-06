@@ -7,7 +7,7 @@ class ContactDensityNaive : public Observable
 {
 private:
   using particle_list_type = std::vector<std::pair<std::shared_ptr<Species>,uint32_t>>;
-  double contact_density; ///< Contact density estimator
+  std::vector<double> contact_density_vec; ///< Contact density estimator
   std::shared_ptr<Species> species_a; ///< First species
   std::shared_ptr<Species> species_b; ///< Second species
   std::vector<particle_list_type> particle_pairs; ///< Vector of particle pairs
@@ -20,28 +20,37 @@ private:
     for (uint32_t b_i=0; b_i<path.GetNBead(); ++b_i) {
       for (const auto& p : particle_pairs) {
         // Move particle
-        path.SetMode(NEW_MODE);
+        path.SetMode(OLD_MODE);
         vec<double> r_old = species_a->GetBead(p[0].second,b_i)->GetR();
+        path.SetMode(NEW_MODE);
         species_a->GetBead(p[0].second,b_i)->SetR(species_b->GetBead(p[1].second,b_i)->GetR());
-
+        vec<double> r_new = species_a->GetBead(p[0].second,b_i)->GetR();
+        // TODO check if particles are maybe in the wrong order in particle_pairs, this would explain somethings
         // Calculate action change
         double old_action = 0.;
         double new_action = 0.;
         for (auto& action: action_list) {
           path.SetMode(OLD_MODE);
-          std::cout << "bi="<<b_i<<"\t"<<action->name<<std::endl;
-          //TODO breaks down if b_i==nbeads-1, ie the last bead
+          //std::cout << "bi="<<b_i<<"\t"<<std::endl;
           //old_action += action->GetAction(b_i+path.GetNBead()-1,b_i+path.GetNBead()+1,p,0);
-          old_action += action->GetAction((b_i+path.GetNBead()-1)%path.GetNBead(),(b_i+path.GetNBead()+1)&path.GetNBead(),p,0);
+          //old_action += action->GetAction(0,b_i-1+path.GetNBead(),p,0)+action->GetAction(b_i+1,path.GetNBead(),p,0);
+          old_action += action->GetAction(0,path.GetNBead()-1,p,0);
           path.SetMode(NEW_MODE);
           //new_action += action->GetAction(b_i+path.GetNBead()-1,b_i+path.GetNBead()+1,p,0);
-          new_action += action->GetAction(b_i+path.GetNBead()-1,b_i+path.GetNBead()+1,p,0);
+          //new_action += action->GetAction(0,b_i-1+path.GetNBead(),p,0)+action->GetAction(b_i+1,path.GetNBead(),p,0);
+          new_action += action->GetAction(0,path.GetNBead()-1,p,0);
+          //TODO why is the kinetic action difference always zero? tests result in r_old-r_new!=0, so kinetic action should not be zero
+          //ANSWER: it is only zeor if we sum up to n_Bead==0, then it is the same partile as before, this should work now
+          //std::cout << old_action-new_action << "\t"<<action->name<<std::endl;
+          //std::cout << "b_i="<<b_i<<"\t"<<cofactor*exp(-(new_action-old_action))<<"\t"<<action->name<<std::endl;
+          //new_action += action->GetAction(0,path.GetNBead(),p,0);
         }
         
         // Record exponential
-        contact_density += cofactor*exp(-(new_action-old_action));
-
-        // Move particle back
+        //contact_density += cofactor*exp(-(new_action-old_action));
+        //std::cout << cofactor*exp(-(new_action-old_action))<<std::endl;
+        contact_density_vec.push_back(cofactor*exp(-(new_action-old_action)));
+        //if(cofactor*exp(-(new_action-old_action))>100.) std::cout <<b_i<<"\t"<< cofactor*exp(-(new_action-old_action))<<"\t"<<-(new_action-old_action)<<"\t"<<new_action<<"\t"<<old_action<<std::endl;
         path.SetMode(NEW_MODE);
         species_a->GetBead(p[0].second,b_i)->SetR(r_old);
       }
@@ -54,7 +63,8 @@ private:
   virtual void Reset()
   {
     n_measure = 0;
-    contact_density = 0;
+    //contact_density = 0;
+    contact_density_vec.clear();
   }
 
 public:
@@ -105,7 +115,17 @@ public:
   virtual void Write()
   {
     if (n_measure > 0) {
-      double norm = path.GetNBead()*n_measure*particle_pairs.size();
+      std::sort(contact_density_vec.begin(),contact_density_vec.end());
+      //double contact_density=std::accumulate(contact_density_vec.begin(),contact_density_vec.end(),0.);
+      double contact_density=0.;
+      int norm=0;
+      for(const double& val : contact_density_vec)
+          if(val<10.){
+              contact_density+=val;
+              ++norm;
+          }
+      //std::accumulate(contact_density_vec.begin(),contact_density_vec.end(),0.);
+      //double norm = path.GetNBead()*n_measure*particle_pairs.size();
       contact_density /= norm;
       if (first_time) {
         first_time = 0;
