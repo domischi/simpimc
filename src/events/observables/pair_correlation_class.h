@@ -32,9 +32,10 @@ private:
             // Image Contribution
             if (image_summation){
               vec<double> shift(path.GetND());
-              for(int i0=-image_max;i0<image_max;++i0) 
-              for(int i1=-image_max;i1<image_max;++i1) 
-              for(int i2=-image_max;i2<image_max;++i2){
+              for(int i0=-image_max;i0<=image_max;++i0) 
+              for(int i1=-image_max;i1<=image_max;++i1) 
+              for(int i2=-image_max;i2<=image_max;++i2)
+                if(i1!=0&&i2!=0&&i3!=0){
                 shift[0]=i0*path.GetL();
                 shift[1]=i1*path.GetL();
                 shift[2]=i2*path.GetL();
