@@ -60,52 +60,6 @@ namespace Contact_Density_Optimization_Functions {
     double laplace_f_Exp(const double &mag_ri_RA, const vec<double> &ri_RA){
         return exp(l*mag_ri_RA)*l*(2+l*mag_ri_RA)/mag_ri_RA;
     }
-
-    double f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
-        double tot=0.;
-        vec<double> Shift(3);
-        for(int i=-Images;i<=Images;++i)
-        for(int j=-Images;j<=Images;++j)
-        for(int k=-Images;k<=Images;++k){
-            Shift[0]=i*L;
-            Shift[1]=j*L;
-            Shift[2]=k*L;
-            vec<double> ri_RA_p=ri_RA+Shift;
-            double mag_ri_RA_p=norm(ri_RA_p);
-            tot+= exp(l*mag_ri_RA_p);
-        }
-        return tot;
-    }
-    vec<double> gradient_f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
-        vec<double> tot(zeros<vec<double>>(3));
-        vec<double> Shift(3);
-        for(int i=-Images;i<=Images;++i)
-        for(int j=-Images;j<=Images;++j)
-        for(int k=-Images;k<=Images;++k){
-            Shift[0]=i*L;
-            Shift[1]=j*L;
-            Shift[2]=k*L;
-            vec<double> ri_RA_p=ri_RA+Shift;
-            double mag_ri_RA_p=norm(ri_RA_p);
-            tot+=l*exp(l*mag_ri_RA_p)*ri_RA_p/mag_ri_RA_p;
-        }
-        return tot;
-    }
-    double laplace_f_Exp_p(const double &mag_ri_RA, const vec<double> &ri_RA){
-        double tot=0.;
-        vec<double> Shift(3);
-        for(int i=-Images;i<=Images;++i)
-        for(int j=-Images;j<=Images;++j)
-        for(int k=-Images;k<=Images;++k){
-            Shift[0]=i*L;
-            Shift[1]=j*L;
-            Shift[2]=k*L;
-            vec<double> ri_RA_p=ri_RA+Shift;
-            double mag_ri_RA_p=norm(ri_RA_p);
-            tot+= exp(l*mag_ri_RA_p)*l*(2+l*mag_ri_RA_p)/mag_ri_RA_p;
-        }
-        return tot;
-    }
 }
 
 /// Measures the contact density between two species of particles. Taken from Assaraf, Caffarel, and Scemma. Phys Rev E 75, 035701(R) (2007). http://journals.aps.org/pre/pdf/10.1103/PhysRevE.75.035701.
@@ -173,7 +127,6 @@ private:
                 i_mag_R_loc+=1./norm(r+L);
                 R_div_mag_R_s_loc+=(r+L)/(norm(r+L)*norm(r+L));
             }
-            //std::cout << "i mag r loc="<<i_mag_R_loc<<"\tnorm r="<<norm(r)<<std::endl;
             i_mag_R.push_back(i_mag_R_loc);
             R_div_mag_R_s0.push_back(R_div_mag_R_s_loc[0]);
             R_div_mag_R_s1.push_back(R_div_mag_R_s_loc[1]);
@@ -190,8 +143,6 @@ private:
 
         double i_mag_ri_R=1.;
         eval_NUBspline_3d_d(Spline_i_mag_R,std::abs(ri_R[0]),std::abs(ri_R[1]),std::abs(ri_R[2]),&i_mag_ri_R);
-        //if(std::abs(mag_ri)) std::cout << "Debug "<<mag_ri_R<<"\t"<<1/norm(ri_R)<<std::endl;
-        //return (-1./(norm(ri_R)*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
         return (-i_mag_ri_R/(4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
     }
     
@@ -210,7 +161,6 @@ private:
         vec<double> n(zeros<vec<double>>(path.GetND()));
         for(int d=0;d<path.GetND();++d){
             if(r1[d]<-(path.GetL()/2-lambda_tau))
-                //n[d]=1.;
                 n[d]=-1.;
             else if(r1[d]>(path.GetL()/2-lambda_tau))
                 n[d]=1.;
@@ -220,11 +170,9 @@ private:
     vec<double> getRelevantNormalVector(const vec<double> &r1,const vec<double> &r2){
         vec<double> n(zeros<vec<double>>(path.GetND()));
         for(int d=0;d<path.GetND();++d){
-            //if((r1[d]<-(path.GetL()/2-2*lambda_tau))&&(r2[d]>(path.GetL()/2-2*lambda_tau))) {
             if((r1[d]<-(path.GetL()/2-1*lambda_tau))&&(r2[d]>(path.GetL()/2-1*lambda_tau))) {
                 n[d]=-1;
             }
-            //else if((r2[d]<-(path.GetL()/2-2*lambda_tau))&&(r1[d]>(path.GetL()/2-2*lambda_tau))) {
             else if((r2[d]<-(path.GetL()/2-1*lambda_tau))&&(r1[d]>(path.GetL()/2-1*lambda_tau))) {
                 n[d]=1;
             }
@@ -234,15 +182,7 @@ private:
     bool BE(const vec<double> &r1, const vec<double> &r2) {
         int nd=r1.n_elem;
         for(int i =0;i<nd;++i)
-            //if((r1[i]<-(path.GetL()/2-2*lambda_tau)&&r2[i]>(path.GetL()/2-2*lambda_tau))||(r2[i]<-(path.GetL()/2-2*lambda_tau)&&r1[i]>(path.GetL()/2-2*lambda_tau)))
             if((r1[i]<-(path.GetL()/2-1*lambda_tau)&&r2[i]>(path.GetL()/2-1*lambda_tau))||(r2[i]<-(path.GetL()/2-1*lambda_tau)&&r1[i]>(path.GetL()/2-1*lambda_tau)))
-                return true;
-        return false;
-    }
-    bool BE2(vec<double> r1) {
-        int nd=r1.n_elem;
-        for(int i =0;i<nd;++i)
-            if((r1[i]<-(path.GetL()/2-1*lambda_tau))||(r1[i]>(path.GetL()/2-1*lambda_tau)))
                 return true;
         return false;
     }
@@ -269,23 +209,8 @@ private:
                 vec<double> gradient_action(zeros<vec<double>>(path.GetND()));
                 double laplacian_action = 0.;
                 for (auto& action: action_list) {
-                    //vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
-                    //vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
                     gradient_action += action->GetActionGradient(b_i,b_i+1,only_ri,0);
-                    //double lapl0=action->GetActionLaplacian(b_i,b_i+1,only_ri,0);
-                    //double lapl1=action->GetActionLaplacian1(b_i,b_i+1,only_ri,0);
                     laplacian_action+= action->GetActionLaplacian(b_i,b_i+1,only_ri,0);
-                    //if(abs(lapl1-lapl0)>1e-12) {
-                    //    std::cout << "---------------------\nin CD, different lapl for "<<action->name<<", lapl0="<<lapl0<<"\tlapl1="<<lapl1<<"\tabs="<<abs(lapl1-lapl0)<<std::endl;
-                    //}
-                    //if((action->name=="Kinetic"||action->name=="KineticE"||action->name=="KineticP")) std::cout <<"Action for "<< action->name<<": norm_grad="<<norm(action->GetActionGradient(b_i,b_i+1,only_ri,0))<<"\tlapl="<<action->GetActionLaplacian(b_i,b_i+1,only_ri,0)<<std::endl;
-                    //if(norm(grad0-grad1)>1e-4) {
-                    //    std::cout << "------------------------------\nin CD, different grad for "<<action->name<<", norm(grad0-grad1)="<<norm(grad0-grad1)<<std::endl;
-                    //    vec<double> grad0=action->GetActionGradient(b_i,b_i+1,only_ri,0);
-                    //    std::cout << "........................."<<std::endl;
-                    //    vec<double> grad1=action->GetActionGradient1(b_i,b_i+1,only_ri,0);
-                    //    std::cout << "------------------------------"<<std::endl;
-                    //}
                 }
                 vec<double> Direction(path.GetND());
                 Direction.randn();
@@ -293,11 +218,9 @@ private:
                 //Histogram loop
                 for (uint32_t i=0;i<gr_vol.x.n_r;++i) {
                     vec<double> Rhist=gr_vol.x.rs(i)*Direction;
-                    //vec<double> RImage(path.GetND());
                     vec<double> R=path.Dr(RA,Rhist);
                     // Get differences
                     vec<double> ri_R(path.Dr(ri,R));
-                    //vec<double> ri_R(path.Dr(ri,R));
                     double mag_ri_R = mag(ri_R);
                     if(mag_ri_R<1e-6){//possibly dividing by near zero, big numerical instabilities therefore skip 
                         continue;
@@ -307,28 +230,17 @@ private:
                     vec<double> gradient_f=Function_gradient_f(mag_ri_R, ri_R);
                     double laplacian_f = Function_laplace_f(mag_ri_R, ri_R);
                     // Volume Term
-                    //tot_vol(i)+=(-1./(mag_ri_R*4.*M_PI))*(laplacian_f + f*(-laplacian_action + dot(gradient_action,gradient_action)) - 2.*dot(gradient_f,gradient_action));
                     tot_vol(i)+=GetVolumeTerm(ri_R, f, gradient_f, laplacian_f, gradient_action, laplacian_action);
                     ++n_measure_vol(i);
                     //Boundary Term
                     if(BE(ri_RA2,ri_RA)&&path.GetPBC()) {
-                    //if(BE2(ri_RA)&&path.GetPBC()) {
-                        //vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
                         vec<double> NormalVector=getRelevantNormalVector(ri_RA2,ri_RA);
-                        if(mag_ri_R<1e-8||norm(NormalVector)!=1.)//It acts in the 3 power in the following part, this can lead to numerical instabilities
+                        if(mag_ri_R<1e-8)//It acts in the 3 power in the following part, this can lead to numerical instabilities
                             continue;
-                        //double VolumeFactor = path.GetVol()/path.GetSurface();//To correct the other measure
-                        //double VolumeFactor = path.GetSurface()/path.GetVol();//To correct the other measure
-                        //tot_b(i)+= (-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector);
-                        
                         tot_b(i) += GetBoundaryTerm(ri_R, f, gradient_f, laplacian_f, gradient_action, laplacian_action, NormalVector);
-                        //if(i==0) std::cout << Optimization_Strategy<<" "<<tot_vol(i)<<" "<<tot_b(i)<<std::endl;
                         ++n_measure_b(i);
-                        //std::cout << n_measure_b(i)<<std::endl;
-                        //std::cout <<norm(NormalVector)<<"\t"<<(-1./(4.*M_PI*mag_ri_R))*dot(IntegrandVector,NormalVector)<<std::endl;
                     }
                 }//End of hist loop
-			//}//End images loop
             }//End of bead loop
         }
         double cofactor = path.GetSign()*path.GetImportanceWeight();

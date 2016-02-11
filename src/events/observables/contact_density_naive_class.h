@@ -107,7 +107,6 @@ public:
           contact_density+=val;
           ++norm;
       }
-      //double norm = path.GetNBead()*n_measure*particle_pairs.size();
       contact_density /= norm;
       if (first_time) {
         first_time = 0;
@@ -115,7 +114,6 @@ public:
       } else {
         out.AppendDataSet(prefix, "x", contact_density);
       }
-
       Reset();
     }
   }
