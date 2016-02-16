@@ -22,12 +22,14 @@ public:
 
   /// Constructor sets the name and type, as well as the relevant references to the path and output file. It also creates the space in the output file for which to write information about the action
   Action(Path &tmp_path, Input &in, IO &tmpOut)
-    : path(tmp_path), out(tmpOut), is_importance_weight(0)
+    : path(tmp_path), out(tmpOut)
   {
     name = in.GetAttribute<std::string>("name");
     type = in.GetAttribute<std::string>("type");
+    is_importance_weight = in.GetAttribute<bool>("is_importance_weight",0);
     out.CreateGroup("Actions/"+name);
     out.Write("Actions/"+name+"/type",type);
+    out.Write("Actions/"+name+"/is_importance_weight",is_importance_weight);
 
     n_images = in.GetAttribute<int>("n_images",0);
     max_level = in.GetAttribute<uint32_t>("max_level",0);
@@ -40,7 +42,7 @@ public:
 
   /// Returns the virial contribution of the action
   virtual double VirialEnergy(const double virial_window_size) { return DActionDBeta(); }
-
+  
   /// Returns the value of the action between time slices b0 and b1 for a vector of particles
   virtual double GetAction(const uint32_t b0, const uint32_t b1, const std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> &particles, const uint32_t level) { return 0.; };
 
@@ -56,7 +58,18 @@ public:
   virtual double Potential() { return 0.; };
 
   /// Returns the importance weight of the action for the whole path
-  virtual double ImportanceWeight() { return 0; };
+  virtual double ImportanceWeight() {
+      if(is_importance_weight){
+          //Construct affected particle vector
+          std::vector<std::pair<std::shared_ptr<Species>,uint32_t>> particles;
+          for(auto species : species_list)
+              for(int i=0;i<species->GetNPart();++i)
+                  particles.push_back(std::make_pair(species,i));
+          return exp(-GetAction(0,path.GetNBead()-1,particles,0));
+      }
+      else
+          return 1.; 
+  };
 
   /// Write information about the action
   virtual void Write() {};

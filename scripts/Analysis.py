@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+#TODO cannot use the variance for the IW if the IW is of order 1e-168 and lower
 import sys
 import os
 import h5py as h5
@@ -40,9 +40,21 @@ class Observable:
     def WriteToFile(self, stats):
         print 'WriteToFile not defined for', self.name
         return 0
+    
+    def Adjust(self, adjustSign, sign_data, adjustIW, IW_data):
+        if adjustSign or adjustIW:
+            print('Adjust '+self.name+'...')
+        if adjustSign:
+            self.AdjustBySign(sign_data)
+        if adjustIW:
+            self.AdjustByIW(IW_data, adjustSign)
 
     def AdjustBySign(self, sign_data):
         print 'AdjustBySign not defined for', self.name
+        return 0
+
+    def AdjustByIW(self, IW_data):
+        print 'AdjustByIW not defined for', self.name
         return 0
 
 # Scalar variables
@@ -89,6 +101,21 @@ class Scalar(Observable):
             err = 0.
         kappa = data[2]
         g = open(self.basename+'/'+self.name+'.adj.dat','w')
+        g.write('%.10e %.10e %.10e\n'%(mean,err,kappa))
+        g.close()
+
+    def AdjustByIW(self, IW_data, preadjusted):
+        if preadjusted:
+            data = np.loadtxt(self.basename+'/'+self.name+'.adj.dat')
+        else:
+            data = np.loadtxt(self.basename+'/'+self.name+'.dat')
+        mean = data[0]/IW_data[0]
+        if data[0] != 0:
+            err = np.abs(mean)*np.sqrt(pow(data[1]/data[0],2) + pow(IW_data[1]/IW_data[0],2))
+        else:
+            err = 0.
+        kappa = data[2]
+        g = open(self.basename+'/'+self.name+'.adj.dat','w') 
         g.write('%.10e %.10e %.10e\n'%(mean,err,kappa))
         g.close()
 
@@ -145,6 +172,23 @@ class Histogram(Observable):
         for i in range(len(errs)):
             if data[i,1] != 0:
                 errs[i] = np.abs(means[i])*np.sqrt(pow(errs[i]/data[i,1],2) + pow(sign_data[1]/sign_data[0],2))
+        kappas = data[:,3]
+        g = open(self.basename+'/'+self.name+'.adj.dat','w')
+        for (x,mean,err,kappa) in zip(xs,means,errs,kappas):
+            g.write('%.10e %.10e %.10e %.10e\n'%(x,mean,err,kappa))
+        g.close()
+    
+    def AdjustByIW(self, IW_data, preadjusted):
+        if preadjusted:
+            data = np.loadtxt(self.basename+'/'+self.name+'.adj.dat')
+        else:
+            data = np.loadtxt(self.basename+'/'+self.name+'.dat')
+        xs = data[:,0]
+        means = data[:,1]/IW_data[0]
+        errs = data[:,2]
+        for i in range(len(errs)):
+            if data[i,1] != 0:
+                errs[i] = np.abs(means[i])*np.sqrt(pow(errs[i]/data[i,1],2) + pow(IW_data[1]/IW_data[0],2))
         kappas = data[:,3]
         g = open(self.basename+'/'+self.name+'.adj.dat','w')
         for (x,mean,err,kappa) in zip(xs,means,errs,kappas):
@@ -367,7 +411,7 @@ def main(argv=None):
     f0.flush()
     f0.close()
 
-    # Compute statistics
+    # Compute sign statistics
     adjustBySign = 0
     sign_data = np.array((1,3))
     for ob in obs:
@@ -375,13 +419,21 @@ def main(argv=None):
         if ob.type == 'Sign':
             adjustBySign = 1
             sign_data = np.loadtxt(ob.basename+'/'+ob.name+'.dat')
+    print sign_data 
+    # Compute importance weight statistics
+    adjustByIW=0
+    IW_data = np.array((1,3))
+    for ob in obs:
+        ob.Process(files)
+        if ob.type == 'ImportanceWeight':
+            adjustByIW = 1
+            IW_data = np.loadtxt(ob.basename+'/'+ob.name+'.dat')
+    print IW_data
+    # Adjust
+    for ob in obs:
+        if ('Observables' in ob.basename) and (not ('Time' in ob.basename)) and (not ('Permutation' in ob.basename)) and (ob.type != 'Sign'):
+            ob.Adjust(adjustBySign, sign_data, adjustByIW, IW_data)
 
-    # Adjust by sign
-    if adjustBySign:
-        for ob in obs:
-            if ('Observables' in ob.basename) and (not ('Time' in ob.basename)) and (not ('Permutation' in ob.basename)) and (ob.type != 'Sign'):
-                print 'Adjusting', ob.name, 'by sign weight'
-                ob.AdjustBySign(sign_data)
 
 if __name__ == "__main__":
     sys.exit(main())

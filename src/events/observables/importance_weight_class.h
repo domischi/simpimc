@@ -55,6 +55,8 @@ public:
         out.CreateExtendableDataSet("/"+prefix+"Total/", "x", IW);
         std::string data_type = "scalar";
         out.Write(prefix+"Total/data_type",data_type);
+        std::string t="ImportanceWeight";
+        out.Write(prefix+"Total/type",t); //Mark it specially to use it in the analysis script //TODO do not hack 
         for (uint32_t i=0; i<action_list.size(); ++i) {
           out.CreateGroup(prefix+action_list[i]->name);
           out.CreateExtendableDataSet("/"+prefix+action_list[i]->name+"/", "x", importance_weights(i));
